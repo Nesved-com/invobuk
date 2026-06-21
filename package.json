@@ -16,7 +16,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
-    "electron:build": "npm run build && electron-builder --win"
+    "electron:build": "npm run build && electron-builder --win",
+    "electron:build:linux": "npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "com.nesved.invobuk",
@@ -32,6 +33,12 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Invobuk"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "src/assets/invobuk-logo-short.png",
+      "category": "Office",
+      "maintainer": "NesVed <contact@nesved.com>"
     },
     "files": [
       "dist/**/*",
@@ -85,5 +92,8 @@
     "typescript": "^5.2.2",
     "vite": "^4.5.1",
     "wait-on": "^9.0.10"
+  },
+  "overrides": {
+    "@noble/hashes": "^1.4.0"
   }
 }
