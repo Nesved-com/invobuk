@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Eye, EyeOff, Lock, Zap, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, Lock, ShieldCheck, FileText, Target, Briefcase, TrendingUp } from 'lucide-react'
 import { useAuthStore, hashPassword } from '@/store/useAuthStore'
-import { useCompanyStore } from '@/store/useCompanyStore'
 import { toast } from 'sonner'
 import invobukLogoShort from '@/assets/invobuk-logo-short.png'
 
+const FEATURES = [
+  { icon: FileText, title: 'Create Invoices', desc: 'Professional invoices in seconds' },
+  { icon: Target, title: 'Track Payments', desc: 'Get paid faster with easy tracking' },
+  { icon: Briefcase, title: 'Manage Business', desc: 'Customers, products & more in one place' },
+  { icon: TrendingUp, title: 'Grow Confidently', desc: 'Reports & insights to grow your business' },
+]
+
 export default function Login() {
   const { setupDone, passwordHash, setPassword, login } = useAuthStore()
-  const { company } = useCompanyStore()
 
   const [password, setPasswordInput] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -16,9 +21,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
 
-  const companyName = company?.name || 'Renuka Electronics & Electricals'
-
-  // Auto-focus input on mount
   useEffect(() => {
     const el = document.getElementById('password-input')
     el?.focus()
@@ -63,97 +65,107 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 flex items-center justify-center p-4">
-      {/* Background pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-400 rounded-full opacity-10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand-500 rounded-full opacity-10 blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-brand-900 flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Decorative blobs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-brand-700 rounded-[40%_60%_55%_45%] opacity-60" />
+          <div className="absolute -top-10 right-10 w-64 h-64 bg-brand-600 rounded-[55%_45%_60%_40%] opacity-40" />
+          <div className="absolute bottom-10 -left-24 w-72 h-72 bg-amber-500 rounded-full opacity-10 blur-3xl" />
+          <div className="absolute top-1/3 left-10 w-3 h-3 bg-amber-400 rounded-full opacity-70" />
+          <div className="absolute top-1/2 left-24 w-2 h-2 bg-amber-300 rounded-full opacity-50" />
+        </div>
 
-      <div className={`relative w-full max-w-sm transition-all duration-200 ${shake ? 'animate-shake' : ''}`}>
-        {/* Card */}
-        <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-brand-700 to-brand-500 px-8 pt-8 pb-10 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-2xl mb-4 backdrop-blur-sm">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-white font-bold text-xl leading-tight">{companyName}</h1>
-            <p className="text-brand-100 text-sm mt-1">Billing Management System</p>
-          </div>
-
-          {/* Form */}
-          <div className="px-8 py-7">
-            <div className="flex items-center gap-2 mb-5">
-              {setupDone
-                ? <><Lock className="w-4 h-4 text-gray-400" /><p className="text-sm text-gray-600 font-medium">Enter your password to continue</p></>
-                : <><ShieldCheck className="w-4 h-4 text-brand-500" /><p className="text-sm text-brand-700 font-semibold">First time? Set a password to secure the app</p></>
-              }
+        <div className={`relative w-full max-w-md transition-all duration-200 ${shake ? 'animate-shake' : ''}`}>
+          <div className="bg-white rounded-3xl shadow-2xl shadow-black/40 overflow-hidden">
+            <div className="px-8 pt-8 pb-2">
+              <div className="flex items-center gap-2.5 mb-1">
+                <img src={invobukLogoShort} alt="Invobuk" className="h-10 w-10 object-contain rounded-xl" />
+                <span className="font-extrabold text-2xl tracking-tight text-gray-900">Invo<span className="text-amber-500">buk</span></span>
+              </div>
+              <p className="text-xs text-gray-400 ml-0.5">Smart Billing, Simple Business</p>
             </div>
 
-            <form onSubmit={setupDone ? handleLogin : handleSetup} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
-                  {setupDone ? 'Password' : 'Create Password'}
-                </label>
+            <div className="px-8 pt-5 pb-7">
+              <h1 className="text-xl font-bold text-gray-900">{setupDone ? 'Welcome Back!' : 'Welcome!'}</h1>
+              <p className="text-sm text-gray-500 mt-1 mb-5">
+                {setupDone
+                  ? 'Sign in to your account and manage your business.'
+                  : 'Set a password to secure the app and get started.'}
+              </p>
+
+              <div className="flex items-center gap-2 mb-4 text-xs font-semibold">
+                {setupDone
+                  ? <><Lock className="w-3.5 h-3.5 text-gray-400" /><span className="text-gray-500">Enter your password to continue</span></>
+                  : <><ShieldCheck className="w-3.5 h-3.5 text-brand-500" /><span className="text-brand-700">First time setup</span></>
+                }
+              </div>
+
+              <form onSubmit={setupDone ? handleLogin : handleSetup} className="space-y-4">
                 <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     id="password-input"
                     type={showPass ? 'text' : 'password'}
                     value={password}
                     onChange={e => setPasswordInput(e.target.value)}
-                    placeholder={setupDone ? 'Enter password' : 'Min. 4 characters'}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
+                    placeholder={setupDone ? 'Password' : 'Create password (min. 4 characters)'}
+                    className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
                     autoComplete="current-password"
                   />
                   <button type="button" onClick={() => setShowPass(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
 
-              {!setupDone && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Confirm Password</label>
+                {!setupDone && (
                   <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type={showConfirm ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Re-enter password"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
+                      placeholder="Confirm password"
+                      className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
                       autoComplete="new-password"
                     />
                     <button type="button" onClick={() => setShowConfirm(p => !p)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                       {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                </div>
-              )}
+                )}
 
-              <button
-                type="submit"
-                disabled={loading || !password || (!setupDone && !confirmPassword)}
-                className="w-full bg-gradient-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-brand-200 disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-              >
-                {loading ? 'Please wait…' : setupDone ? 'Unlock App' : 'Set Password & Continue'}
-              </button>
-            </form>
-          </div>
+                <button
+                  type="submit"
+                  disabled={loading || !password || (!setupDone && !confirmPassword)}
+                  className="w-full bg-gradient-to-r from-brand-800 to-brand-600 hover:from-brand-900 hover:to-brand-700 text-white font-semibold py-3 rounded-xl text-sm transition-all shadow-lg shadow-brand-200 disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                >
+                  {loading ? 'Please wait…' : setupDone ? 'Sign In' : 'Set Password & Continue'}
+                </button>
+              </form>
+            </div>
 
-          <div className="px-8 pb-5 text-center">
-            <p className="text-xs text-gray-400">Renuka Electronics & Electricals — Billing v1.0</p>
+            <div className="px-8 pb-6 text-center">
+              <p className="text-xs text-gray-400">© {new Date().getFullYear()} NesVed. All rights reserved.</p>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="mt-5 flex flex-col items-center gap-1.5">
-          <a href="https://www.nesved.com" target="_blank" rel="noreferrer" className="flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
-            <img src={invobukLogoShort} alt="Invobuk" className="h-7 w-7 object-contain rounded-md" />
-            <span className="font-bold text-white text-lg">Invo<span className="text-amber-400">buk</span></span>
-          </a>
-          <p className="text-[11px] text-brand-100/70">© {new Date().getFullYear()} NesVed. All rights reserved.</p>
+      {/* Feature strip */}
+      <div className="bg-brand-900 px-6 pb-8 pt-2">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {FEATURES.map(f => (
+            <div key={f.title} className="bg-brand-800/60 border border-brand-700/50 rounded-2xl p-4">
+              <div className="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center mb-3">
+                <f.icon className="w-4.5 h-4.5 text-white" />
+              </div>
+              <p className="text-white text-sm font-semibold">{f.title}</p>
+              <p className="text-brand-300 text-xs mt-0.5">{f.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
 

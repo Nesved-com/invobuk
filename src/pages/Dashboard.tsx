@@ -1,15 +1,32 @@
 import { Link } from 'react-router-dom'
-import { Users, Package, FileText, Receipt, ShoppingCart, ArrowUpRight, DollarSign } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { TrendingUp, TrendingDown, FileText, Receipt, Users, Package, ChevronRight } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts'
 import { useInvoiceStore } from '@/store/useInvoiceStore'
 import { useCustomerStore } from '@/store/useCustomerStore'
 import { useProductStore } from '@/store/useProductStore'
 import { useQuotationStore } from '@/store/useQuotationStore'
 import { usePurchaseOrderStore } from '@/store/usePurchaseOrderStore'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import StatusBadge from '@/components/shared/StatusBadge'
+import { formatDate } from '@/lib/utils'
 
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function formatCompact(amount: number): string {
+  return '₹' + Math.round(amount).toLocaleString('en-IN')
+}
+
+function pctChange(curr: number, prev: number): number {
+  if (prev === 0) return curr > 0 ? 100 : 0
+  return Math.round(((curr - prev) / prev) * 1000) / 10
+}
+
+function inMonth(dateStr: string, year: number, month: number): boolean {
+  const d = new Date(dateStr)
+  return d.getFullYear() === year && d.getMonth() === month
+}
+
+const STATUS_PILL: Record<string, string> = {
+  paid: 'bg-green-100 text-green-700',
+  pending: 'bg-amber-100 text-amber-700',
+  overdue: 'bg-red-100 text-red-700',
+}
 
 export default function Dashboard() {
   const { invoices } = useInvoiceStore()
@@ -18,142 +35,275 @@ export default function Dashboard() {
   const { quotations } = useQuotationStore()
   const { purchaseOrders } = usePurchaseOrderStore()
 
-  const totalRevenue = invoices.reduce((sum, i) => sum + i.grandTotal, 0)
+  const now = new Date()
+  const curY = now.getFullYear(), curM = now.getMonth()
+  const prevDate = new Date(curY, curM - 1, 1)
+  const prevY = prevDate.getFullYear(), prevM = prevDate.getMonth()
 
-  const revenueByMonth = months.map((month, idx) => ({
-    month,
-    revenue: invoices
-      .filter(i => new Date(i.date).getMonth() === idx)
-      .reduce((sum, i) => sum + i.grandTotal, 0),
-    invoices: invoices.filter(i => new Date(i.date).getMonth() === idx).length,
-  }))
+  const thisMonthInvoices = invoices.filter(i => inMonth(i.date, curY, curM))
+  const lastMonthInvoices = invoices.filter(i => inMonth(i.date, prevY, prevM))
+
+  const totalSales = invoices.reduce((s, i) => s + i.grandTotal, 0)
+  const totalSalesThisMonth = thisMonthInvoices.reduce((s, i) => s + i.grandTotal, 0)
+  const totalSalesLastMonth = lastMonthInvoices.reduce((s, i) => s + i.grandTotal, 0)
+
+  const paidAmount = invoices.reduce((s, i) => s + i.paidAmount, 0)
+  const paidThisMonth = thisMonthInvoices.reduce((s, i) => s + i.paidAmount, 0)
+  const paidLastMonth = lastMonthInvoices.reduce((s, i) => s + i.paidAmount, 0)
+
+  const dueAmount = totalSales - paidAmount
+  const dueThisMonth = thisMonthInvoices.reduce((s, i) => s + (i.grandTotal - i.paidAmount), 0)
+  const dueLastMonth = lastMonthInvoices.reduce((s, i) => s + (i.grandTotal - i.paidAmount), 0)
+
+  const totalInvoices = invoices.length
 
   const stats = [
-    { label: 'Total Revenue', value: formatCurrency(totalRevenue), icon: DollarSign, color: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', change: '+12%' },
-    { label: 'Total Invoices', value: invoices.length.toString(), icon: Receipt, color: 'bg-brand-500', bg: 'bg-brand-50', text: 'text-brand-700', change: '' },
-    { label: 'Customers', value: customers.length.toString(), icon: Users, color: 'bg-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', change: '' },
+    { label: 'Total Sales', value: formatCompact(totalSales), change: pctChange(totalSalesThisMonth, totalSalesLastMonth) },
+    { label: 'Paid Amount', value: formatCompact(paidAmount), change: pctChange(paidThisMonth, paidLastMonth) },
+    { label: 'Due Amount', value: formatCompact(dueAmount), change: pctChange(dueThisMonth, dueLastMonth), inverse: true },
+    { label: 'Total Invoices', value: totalInvoices.toLocaleString('en-IN'), change: pctChange(thisMonthInvoices.length, lastMonthInvoices.length), icon: true },
   ]
 
-  const recentInvoices = invoices.slice(0, 5)
+  // 5 weekly buckets for "Sales Overview" — current month vs previous month, aligned by week index.
+  const weekBuckets = [1, 8, 15, 22, 29]
+  const salesOverview = weekBuckets.map(startDay => {
+    const inBucket = (d: Date, y: number, m: number) =>
+      d.getFullYear() === y && d.getMonth() === m && d.getDate() >= startDay && d.getDate() < startDay + 7
+    const sales = invoices.filter(i => inBucket(new Date(i.date), curY, curM)).reduce((s, i) => s + i.grandTotal, 0)
+    const prevSales = invoices.filter(i => inBucket(new Date(i.date), prevY, prevM)).reduce((s, i) => s + i.grandTotal, 0)
+    return { label: `${String(startDay).padStart(2, '0')} ${now.toLocaleString('en-US', { month: 'short' })}`, sales, prevSales }
+  })
+
+  // Invoices by status
+  const paidCount = invoices.filter(i => i.status === 'paid').length
+  const overdueCount = invoices.filter(i => i.status === 'overdue').length
+  const pendingCount = Math.max(totalInvoices - paidCount - overdueCount, 0)
+  const statusData = [
+    { name: 'Paid', value: paidCount, color: '#22c55e' },
+    { name: 'Pending', value: pendingCount, color: '#f59e0b' },
+    { name: 'Overdue', value: overdueCount, color: '#ef4444' },
+  ]
+
+  const recentInvoices = [...invoices].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
+
+  // Top customers by total invoiced amount
+  const customerTotals = new Map<string, number>()
+  invoices.forEach(i => customerTotals.set(i.customerId, (customerTotals.get(i.customerId) || 0) + i.grandTotal))
+  const topCustomers = [...customerTotals.entries()]
+    .map(([customerId, total]) => ({ customer: customers.find(c => c.id === customerId), total }))
+    .filter(c => c.customer)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+
+  // Cash flow — weekly buckets this month: cash in (collected) vs cash out (purchase orders)
+  const cashFlow = weekBuckets.map(startDay => {
+    const inBucket = (d: Date) => d.getFullYear() === curY && d.getMonth() === curM && d.getDate() >= startDay && d.getDate() < startDay + 7
+    const cashIn = invoices.filter(i => inBucket(new Date(i.date))).reduce((s, i) => s + i.paidAmount, 0)
+    const cashOut = purchaseOrders.filter(p => inBucket(new Date(p.date))).reduce((s, p) => s + p.grandTotal, 0)
+    return { label: String(startDay).padStart(2, '0'), cashIn, cashOut }
+  })
+  const cashInTotal = cashFlow.reduce((s, c) => s + c.cashIn, 0)
+  const cashOutTotal = cashFlow.reduce((s, c) => s + c.cashOut, 0)
+
+  const snapshot = [
+    { label: 'Total Customers', count: customers.length, icon: Users,
+      change: pctChange(customers.filter(c => inMonth(c.createdAt, curY, curM)).length, customers.filter(c => inMonth(c.createdAt, prevY, prevM)).length) },
+    { label: 'Total Products', count: products.length, icon: Package,
+      change: pctChange(products.filter(p => inMonth(p.createdAt, curY, curM)).length, products.filter(p => inMonth(p.createdAt, prevY, prevM)).length) },
+    { label: 'Total Quotations', count: quotations.length, icon: FileText,
+      change: pctChange(quotations.filter(q => inMonth(q.createdAt, curY, curM)).length, quotations.filter(q => inMonth(q.createdAt, prevY, prevM)).length) },
+    { label: 'Total Purchase Orders', count: purchaseOrders.length, icon: Receipt,
+      change: pctChange(purchaseOrders.filter(p => inMonth(p.createdAt, curY, curM)).length, purchaseOrders.filter(p => inMonth(p.createdAt, prevY, prevM)).length) },
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
-                {s.change && <span className="text-xs text-emerald-600 font-medium">{s.change} this month</span>}
+    <div className="space-y-5">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map(s => {
+          const positive = s.inverse ? s.change <= 0 : s.change >= 0
+          return (
+            <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-gray-500">{s.label}</p>
+                {s.icon && <FileText className="w-4 h-4 text-brand-400" />}
               </div>
-              <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center`}>
-                <s.icon className={`w-5 h-5 ${s.text}`} />
+              <p className="text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
+              <div className={`flex items-center gap-1 text-xs font-semibold mt-1.5 ${positive ? 'text-green-600' : 'text-red-500'}`}>
+                {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {Math.abs(s.change)}% <span className="text-gray-400 font-normal">from last month</span>
               </div>
             </div>
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Sales Overview */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-gray-800">Sales Overview</h3>
+            <span className="text-xs font-medium text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1">This Month</span>
           </div>
-        ))}
-      </div>
-
-      {/* Quick Links */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { to: '/invoices/new', label: 'New Invoice', icon: Receipt, color: 'bg-brand-600 hover:bg-brand-700' },
-          { to: '/quotations/new', label: 'New Quotation', icon: FileText, color: 'bg-purple-600 hover:bg-purple-700' },
-          { to: '/purchase-orders/new', label: 'New PO', icon: ShoppingCart, color: 'bg-amber-500 hover:bg-amber-600' },
-        ].map(item => (
-          <Link key={item.to} to={item.to} className={`${item.color} text-white rounded-2xl p-4 flex items-center gap-3 transition-colors shadow-lg`}>
-            <item.icon className="w-5 h-5" />
-            <span className="font-semibold text-sm">{item.label}</span>
-            <ArrowUpRight className="w-4 h-4 ml-auto" />
-          </Link>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-700 mb-4">Revenue Overview</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={revenueByMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
-              <Bar dataKey="revenue" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-700 mb-4">Invoice Trend</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={revenueByMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Line type="monotone" dataKey="invoices" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 4 }} />
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={salesOverview}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v / 100000}L`} />
+              <Tooltip formatter={(v: number) => formatCompact(v)} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line type="monotone" dataKey="sales" name="Sales" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4, fill: '#16a34a' }} />
+              <Line type="monotone" dataKey="prevSales" name="Previous Month" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="5 5" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
+
+        {/* Recent Invoices */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-800">Recent Invoices</h3>
+            <Link to="/invoices" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All</Link>
+          </div>
+          {recentInvoices.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No invoices yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {recentInvoices.map(inv => {
+                const pillKey = inv.status === 'paid' ? 'paid' : inv.status === 'overdue' ? 'overdue' : 'pending'
+                return (
+                  <Link key={inv.id} to={`/invoices/${inv.id}`} className="flex items-center justify-between py-2 -mx-2 px-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div>
+                      <p className="text-sm font-semibold text-brand-700">{inv.number}</p>
+                      <p className="text-xs text-gray-500">{inv.customerName}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-800">{formatCompact(inv.grandTotal)}</p>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold capitalize ${STATUS_PILL[pillKey]}`}>{pillKey}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300" />
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Products', count: products.length, to: '/products', icon: Package, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Quotations', count: quotations.length, to: '/quotations', icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Purchase Orders', count: purchaseOrders.length, to: '/purchase-orders', icon: ShoppingCart, color: 'text-teal-600', bg: 'bg-teal-50' },
-        ].map(item => (
-          <Link key={item.to} to={item.to} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
-            <div className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center`}>
-              <item.icon className={`w-6 h-6 ${item.color}`} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Invoices by Status */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <h3 className="font-bold text-gray-800 mb-3">Invoices by Status</h3>
+          <div className="flex items-center gap-4">
+            <div className="relative w-32 h-32 flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusData} dataKey="value" innerRadius={38} outerRadius={58} paddingAngle={2}>
+                    {statusData.map(d => <Cell key={d.name} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-lg font-bold text-gray-900">{totalInvoices.toLocaleString('en-IN')}</p>
+                <p className="text-[10px] text-gray-400">Total</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm">
+              {statusData.map(d => (
+                <div key={d.name} className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                  <span className="text-gray-600">{d.name}</span>
+                  <span className="text-gray-400 text-xs">{d.value} ({totalInvoices ? Math.round((d.value / totalInvoices) * 1000) / 10 : 0}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Customers */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-800">Top Customers</h3>
+            <Link to="/customers" className="text-xs font-semibold text-brand-600 hover:text-brand-700">View All</Link>
+          </div>
+          {topCustomers.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No customer activity yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {topCustomers.map(({ customer, total }) => {
+                const initials = (customer!.name || '').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('')
+                return (
+                  <Link key={customer!.id} to="/customers" className="flex items-center gap-3 py-2 -mx-2 px-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
+                    <span className="text-sm text-gray-700 flex-1 truncate">{customer!.name}</span>
+                    <span className="text-sm font-bold text-gray-800">{formatCompact(total)}</span>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Cash Flow */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-gray-800">Cash Flow</h3>
+            <span className="text-xs font-medium text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1">This Month</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase">Cash In</p>
+              <p className="text-sm font-bold text-green-600">{formatCompact(cashInTotal)}</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{item.count}</p>
-              <p className="text-sm text-gray-500">{item.label}</p>
+              <p className="text-[10px] text-gray-400 uppercase">Cash Out</p>
+              <p className="text-sm font-bold text-red-500">{formatCompact(cashOutTotal)}</p>
             </div>
-          </Link>
-        ))}
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase">Net Flow</p>
+              <p className="text-sm font-bold text-gray-800">{formatCompact(cashInTotal - cashOutTotal)}</p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={cashFlow}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v / 1000}k`} />
+              <Tooltip formatter={(v: number) => formatCompact(v)} />
+              <Bar dataKey="cashIn" name="Cash In" fill="#86efac" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="cashOut" name="Cash Out" fill="#fca5a5" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Recent Invoices */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-700">Recent Invoices</h3>
-          <Link to="/invoices" className="text-sm text-brand-600 hover:text-brand-700 font-medium">View all</Link>
+      {/* Business Snapshot */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 className="font-bold text-gray-800 mb-3">Business Snapshot</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {snapshot.map(s => (
+            <div key={s.label} className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <s.icon className="w-5 h-5 text-brand-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-lg font-bold text-gray-900">{s.count.toLocaleString('en-IN')}</p>
+                  <span className={`text-xs font-semibold flex items-center gap-0.5 ${s.change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {s.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {Math.abs(s.change)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-        {recentInvoices.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400">
-            <Receipt className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            <p>No invoices yet. <Link to="/invoices/new" className="text-brand-600 hover:underline">Create your first invoice</Link></p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
-              <tr>
-                <th className="px-6 py-3 text-left">Invoice #</th>
-                <th className="px-6 py-3 text-left">Customer</th>
-                <th className="px-6 py-3 text-left">Date</th>
-                <th className="px-6 py-3 text-right">Amount</th>
-                <th className="px-6 py-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {recentInvoices.map(inv => (
-                <tr key={inv.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-brand-700 text-sm">{inv.number}</td>
-                  <td className="px-6 py-3 text-sm text-gray-700">{inv.customerName}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{formatDate(inv.date)}</td>
-                  <td className="px-6 py-3 text-sm font-semibold text-right">{formatCurrency(inv.grandTotal)}</td>
-                  <td className="px-6 py-3 text-center"><StatusBadge status={inv.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
+
+      <p className="text-xs text-gray-400 text-center">Last updated {formatDate(now.toISOString())}</p>
     </div>
   )
 }
