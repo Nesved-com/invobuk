@@ -9,6 +9,7 @@
 //     --key INV-XXXX-XXXX-XXXX --machine <machine-id> [--label "Customer's PC"] [--force]
 
 const FUNCTIONS_URL = 'https://mqsqfbvoupzxqmbyxugd.supabase.co/functions/v1/assign-license'
+const ANON_KEY = 'sb_publishable_WRx-5aulzkSNzZvr8_IGdQ_XHy-PKka' // public key, safe to embed
 
 function parseArgs(argv) {
   const out = {}
@@ -37,7 +38,7 @@ async function main() {
 
   const res = await fetch(FUNCTIONS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-secret': adminSecret },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON_KEY}`, 'x-admin-secret': adminSecret },
     body: JSON.stringify({
       licenseKey: args.key,
       machineId: args.machine,

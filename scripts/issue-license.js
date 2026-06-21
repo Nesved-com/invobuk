@@ -13,6 +13,7 @@
 // invobuk-licensing Supabase project. Never commit it or hardcode it here.
 
 const FUNCTIONS_URL = 'https://mqsqfbvoupzxqmbyxugd.supabase.co/functions/v1/issue-license'
+const ANON_KEY = 'sb_publishable_WRx-5aulzkSNzZvr8_IGdQ_XHy-PKka' // public key, safe to embed
 
 function parseArgs(argv) {
   const out = {}
@@ -41,7 +42,7 @@ async function main() {
 
   const res = await fetch(FUNCTIONS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-secret': adminSecret },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON_KEY}`, 'x-admin-secret': adminSecret },
     body: JSON.stringify({
       customerName: args.customer,
       customerEmail: args.email,
