@@ -3,6 +3,7 @@ import { HashRouter as BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/useAuthStore'
 import { useLicenseStore } from './store/useLicenseStore'
+import { useInvoiceStore } from './store/useInvoiceStore'
 import { activateLicense, daysUntil } from './lib/license'
 import { ConfirmDialogProvider } from './components/ui/confirm-dialog'
 import LicenseActivation from './pages/LicenseActivation'
@@ -36,6 +37,11 @@ import DeliveryChallanForm from './pages/DeliveryChallanForm'
 export default function App() {
   const { isLoggedIn } = useAuthStore()
   const license = useLicenseStore()
+  const invoicesLoaded = useInvoiceStore((s) => s.loaded)
+
+  useEffect(() => {
+    if (isLoggedIn) useInvoiceStore.getState().init()
+  }, [isLoggedIn])
 
   // Hard local check: a previously-valid key may have simply lapsed since activation.
   useEffect(() => {
@@ -77,6 +83,14 @@ export default function App() {
         <Toaster position="top-right" richColors />
         <Login />
       </>
+    )
+  }
+
+  if (!invoicesLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Toaster position="top-right" richColors />
+      </div>
     )
   }
 

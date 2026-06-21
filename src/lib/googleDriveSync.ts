@@ -1,3 +1,5 @@
+import { dbGetAll, dbBulkInsert } from '@/lib/sqliteStorage'
+
 const DRIVE_FILE_NAME = 'renuka-billing-backup.json'
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file'
@@ -82,9 +84,8 @@ async function findBackupFileId(): Promise<string | null> {
   return data.files?.[0]?.id ?? null
 }
 
-export function collectAllData(): Record<string, any> {
+export async function collectAllData(): Promise<Record<string, any>> {
   const keys = [
-    'billing-invoices',
     'billing-quotations',
     'billing-purchase-orders',
     'billing-products-v2',
@@ -97,6 +98,8 @@ export function collectAllData(): Record<string, any> {
     const val = localStorage.getItem(k)
     if (val) result[k] = JSON.parse(val)
   }
+  // Invoices live in SQLite now (not the JSON-file stores above) — include them separately.
+  result['sqlite-invoices'] = await dbGetAll('invoices')
   return result
 }
 
@@ -106,7 +109,7 @@ export async function uploadBackup(): Promise<void> {
   const payload = {
     exportedAt: new Date().toISOString(),
     appVersion: '1.0.0',
-    data: collectAllData(),
+    data: await collectAllData(),
   }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
 
@@ -147,6 +150,10 @@ export async function downloadBackup(): Promise<Record<string, any> | null> {
 export async function restoreFromBackup(backup: Record<string, any>): Promise<void> {
   const data = backup.data ?? backup
   for (const [key, value] of Object.entries(data)) {
+    if (key === 'sqlite-invoices') {
+      if (Array.isArray(value) && value.length > 0) await dbBulkInsert('invoices', value)
+      continue
+    }
     localStorage.setItem(key, JSON.stringify(value))
   }
 }
