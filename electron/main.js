@@ -10,35 +10,43 @@ function getMachineId() {
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
 
-// electron-store v11+ is ESM-only; use dynamic import
-let store
+// electron-store v11+ is ESM-only; use dynamic import.
+// Each Zustand store on the renderer side calls persist() with its own unique
+// name (e.g. "billing-invoices-v1", "billing-customers-v2"). We give each of
+// those names its own electron-store instance, so each menu/data-domain gets
+// its own JSON file instead of one giant combined file:
+//   C:\Users\<Name>\AppData\Roaming\Invobuk\billing-invoices-v1.json
+//   C:\Users\<Name>\AppData\Roaming\Invobuk\billing-customers-v2.json
+//   ...etc, one per store.
+const stores = new Map()
 
-async function initStore() {
-  const { default: Store } = await import('electron-store')
-  store = new Store({
-    name: 'invobuk-data',
-    // Stores at: C:\Users\<Name>\AppData\Roaming\Invobuk\invobuk-data.json
-  })
+async function getStore(name) {
+  if (!stores.has(name)) {
+    const { default: Store } = await import('electron-store')
+    stores.set(name, new Store({ name }))
+  }
+  return stores.get(name)
 }
 
 // IPC handlers — called from renderer via preload.js
-ipcMain.handle('store-get', (_event, key) => {
-  return store ? store.get(key, null) : null
+ipcMain.handle('store-get', async (_event, key) => {
+  const store = await getStore(key)
+  return store.get('data', null)
 })
 
-ipcMain.handle('store-set', (_event, key, value) => {
-  if (store) store.set(key, value)
+ipcMain.handle('store-set', async (_event, key, value) => {
+  const store = await getStore(key)
+  store.set('data', value)
 })
 
-ipcMain.handle('store-delete', (_event, key) => {
-  if (store) store.delete(key)
+ipcMain.handle('store-delete', async (_event, key) => {
+  const store = await getStore(key)
+  store.delete('data')
 })
 
 ipcMain.handle('get-machine-id', () => getMachineId())
 
 async function createWindow() {
-  await initStore()
-
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
