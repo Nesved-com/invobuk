@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { KeyRound, Loader2, Copy, Check } from 'lucide-react'
+import { useState } from 'react'
+import { KeyRound, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useLicenseStore } from '@/store/useLicenseStore'
-import { activateLicense, formatExpiry, getMachineId } from '@/lib/license'
+import { activateLicense, formatExpiry } from '@/lib/license'
 import invobukLogoShort from '@/assets/invobuk-logo-short.png'
 
 export default function LicenseActivation() {
@@ -10,16 +10,6 @@ export default function LicenseActivation() {
   const [key, setKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
-  const [machineId, setMachineId] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => { getMachineId().then(setMachineId) }, [])
-
-  const handleCopyMachineId = async () => {
-    await navigator.clipboard.writeText(machineId)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,20 +84,6 @@ export default function LicenseActivation() {
               </form>
 
               <p className="text-xs text-gray-400 text-center mt-4">Don't have a license key? Contact contact@nesved.com</p>
-              {machineId && (
-                <button
-                  type="button"
-                  onClick={handleCopyMachineId}
-                  title="Send this to NesVed if they need to manually assign your license"
-                  className="w-full mt-3 flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-left transition-colors"
-                >
-                  <div className="overflow-hidden">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase">Machine ID</p>
-                    <p className="text-xs font-mono text-gray-600 truncate">{machineId}</p>
-                  </div>
-                  {copied ? <Check className="w-4 h-4 text-green-500 flex-shrink-0" /> : <Copy className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                </button>
-              )}
             </div>
 
             <div className="px-8 pb-6 text-center">
