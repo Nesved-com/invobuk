@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build-windows-installer:
     runs-on: windows-latest
@@ -30,21 +33,60 @@ jobs:
           echo "Found installer: $FILE"
           echo "path=$FILE" >> "$GITHUB_OUTPUT"
 
-      - name: Upload installer to Supabase Storage
-        shell: bash
-        env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          curl -sS -X POST \
-            "https://mqsqfbvoupzxqmbyxugd.supabase.co/storage/v1/object/downloads/Invobuk-Setup.exe" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/vnd.microsoft.portable-executable" \
-            -H "x-upsert: true" \
-            --data-binary "@${{ steps.find_installer.outputs.path }}" \
-            --fail
-
       - name: Upload installer as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: invobuk-installer
+          name: invobuk-windows-installer
           path: ${{ steps.find_installer.outputs.path }}
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find_installer.outputs.path }}
+          fail_on_unmatched_files: true
+
+  build-linux-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app and Linux packages (AppImage + deb)
+        run: npm run electron:build:linux
+
+      - name: Find installer files
+        id: find_installers
+        run: |
+          APPIMAGE=$(find dist-electron -maxdepth 1 -iname "*.AppImage" | head -n 1)
+          DEB=$(find dist-electron -maxdepth 1 -iname "*.deb" | head -n 1)
+          echo "Found: $APPIMAGE and $DEB"
+          {
+            echo "files<<EOF"
+            echo "$APPIMAGE"
+            echo "$DEB"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload installers as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: invobuk-linux-installers
+          path: |
+            dist-electron/*.AppImage
+            dist-electron/*.deb
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-electron/*.AppImage
+            dist-electron/*.deb
+          fail_on_unmatched_files: true
