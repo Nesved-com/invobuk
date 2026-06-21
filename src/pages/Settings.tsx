@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Save, Building2, CreditCard, FileText, Cloud, CloudOff, RefreshCw, Download, CheckCircle, AlertCircle, Lock, UserCircle, Globe, Mail, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCompanyStore } from '@/store/useCompanyStore'
@@ -41,6 +42,13 @@ export default function Settings() {
   const [form, setForm] = useState<Company>({ ...company })
   const confirm = useConfirm()
   const license = useLicenseStore()
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('section') === 'about-license') {
+      document.getElementById('about-license')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [searchParams])
 
   const handleDeactivateLicense = async () => {
     if (await confirm('This frees up the activation so the same key can be used on another computer, and locks this app until a valid license key is entered again.', { title: 'Deactivate license?', confirmText: 'Deactivate' })) {
@@ -403,7 +411,7 @@ export default function Settings() {
       </form>
 
       {/* About & License */}
-      <Card className="mt-5 mb-8" title="About & License"
+      <Card id="about-license" className="mt-5 mb-8" title="About & License"
         headerRight={<div className="w-8 h-8 bg-brand-100 rounded-xl flex items-center justify-center"><ShieldCheck className="w-4 h-4 text-brand-700" /></div>}>
         <CardBody className="space-y-4">
           <div className="flex items-center gap-3">

@@ -52,7 +52,13 @@ async function createWindow() {
     },
   })
 
-  win.loadFile(path.join(__dirname, '../dist/index.html'))
+  const devServerUrl = process.env.ELECTRON_START_URL
+  if (devServerUrl) {
+    win.loadURL(devServerUrl)
+    win.webContents.openDevTools({ mode: 'detach' })
+  } else {
+    win.loadFile(path.join(__dirname, '../dist/index.html'))
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
