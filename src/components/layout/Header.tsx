@@ -1,31 +1,24 @@
 import { useState } from 'react'
-import { ChevronDown, Settings as SettingsIcon, LogOut } from 'lucide-react'
+import { ChevronDown, UserCircle, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '@/store/useUserStore'
 import { useAuthStore } from '@/store/useAuthStore'
-import AddNameModal from './AddNameModal'
 
 export default function Header() {
   const { firstName, lastName } = useUserStore()
   const { logout } = useAuthStore()
   const navigate = useNavigate()
-  const [showModal, setShowModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
 
   const fullName = [firstName, lastName].filter(Boolean).join(' ')
   const initials = (fullName || 'A U').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('')
-
-  const handleAvatarClick = () => {
-    if (!fullName) { setShowModal(true); return }
-    setShowMenu(p => !p)
-  }
 
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-end px-6 flex-shrink-0">
       <div className="flex items-center gap-4">
         <div className="relative">
           <button
-            onClick={handleAvatarClick}
+            onClick={() => setShowMenu(p => !p)}
             className="flex items-center gap-2 pl-3 border-l border-gray-200"
           >
             <div className="w-9 h-9 rounded-full bg-brand-700 flex items-center justify-center text-white text-xs font-bold">
@@ -48,7 +41,7 @@ export default function Header() {
                   onClick={() => { setShowMenu(false); navigate('/profile') }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <SettingsIcon className="w-4 h-4 text-gray-400" /> Profile
+                  <UserCircle className="w-4 h-4 text-gray-400" /> Profile
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); logout() }}
@@ -61,13 +54,6 @@ export default function Header() {
           )}
         </div>
       </div>
-
-      {showModal && (
-        <AddNameModal
-          onClose={() => setShowModal(false)}
-          onGoToSettings={() => { setShowModal(false); navigate('/profile') }}
-        />
-      )}
     </header>
   )
 }

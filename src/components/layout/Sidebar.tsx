@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Receipt,
   MapPin,
-  LogOut,
   Truck,
   ShieldCheck,
   UserCircle,
@@ -18,7 +17,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
-import { useAuthStore } from '@/store/useAuthStore'
 import invobukLogoShort from '@/assets/invobuk-logo-short.png'
 
 const navItems = [
@@ -38,7 +36,6 @@ const navItems = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
-  const { logout } = useAuthStore()
 
   return (
     <aside
@@ -89,7 +86,7 @@ export default function Sidebar() {
         {collapsed ? <ChevronRight className="w-3 h-3 text-white" /> : <ChevronLeft className="w-3 h-3 text-white" />}
       </button>
 
-      {/* About & License / Lock+Logout */}
+      {/* About & License */}
       <div className={cn('px-2.5 pb-3 pt-2 space-y-1 border-t border-brand-800', collapsed && 'px-2')}>
         <NavLink
           to="/about-license"
@@ -105,18 +102,6 @@ export default function Sidebar() {
           <ShieldCheck className="w-[18px] h-[18px] flex-shrink-0" />
           {!collapsed && <span>About & License</span>}
         </NavLink>
-
-        <button
-          onClick={logout}
-          title="Lock / Logout"
-          className={cn(
-            'flex items-center gap-3 w-full px-2.5 py-2.5 rounded-xl text-sm font-medium text-brand-200 hover:bg-white/10 hover:text-white transition-all duration-150',
-            collapsed && 'justify-center px-2'
-          )}
-        >
-          <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
-          {!collapsed && <span>Lock / Logout</span>}
-        </button>
       </div>
     </aside>
   )
