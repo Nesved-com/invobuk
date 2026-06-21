@@ -1,4 +1,4 @@
-import { Globe, Mail, Download, ShieldCheck } from 'lucide-react'
+import { Globe, Mail, Download, ShieldCheck, Laptop } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
@@ -38,8 +38,11 @@ export default function AboutLicense() {
             <a href="mailto:contact@nesved.com" className="flex items-center gap-2 text-brand-600 hover:underline">
               <Mail className="w-4 h-4" /> contact@nesved.com
             </a>
-            <a href="https://mqsqfbvoupzxqmbyxugd.supabase.co/storage/v1/object/public/downloads/Invobuk-Setup.exe" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline sm:col-span-2">
-              <Download className="w-4 h-4" /> Download latest version
+            <a href="https://github.com/Nesved-com/invobuk/releases/latest/download/Invobuk-Setup.exe" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline">
+              <Download className="w-4 h-4" /> Download for Windows
+            </a>
+            <a href="https://github.com/Nesved-com/invobuk/releases/latest/download/Invobuk.AppImage" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline">
+              <Laptop className="w-4 h-4" /> Download for Linux (AppImage)
             </a>
           </div>
 
