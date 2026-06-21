@@ -65,19 +65,19 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-900 flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Decorative blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-brand-700 rounded-[40%_60%_55%_45%] opacity-60" />
-          <div className="absolute -top-10 right-10 w-64 h-64 bg-brand-600 rounded-[55%_45%_60%_40%] opacity-40" />
-          <div className="absolute bottom-10 -left-24 w-72 h-72 bg-amber-500 rounded-full opacity-10 blur-3xl" />
-          <div className="absolute top-1/3 left-10 w-3 h-3 bg-amber-400 rounded-full opacity-70" />
-          <div className="absolute top-1/2 left-24 w-2 h-2 bg-amber-300 rounded-full opacity-50" />
-        </div>
+    <div className="min-h-screen bg-white flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Decorative shapes */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] bg-brand-800 rounded-[35%_65%_60%_40%]" />
+        <div className="absolute -top-16 left-44 w-44 h-44 bg-white rounded-full" />
+        <div className="absolute top-[38%] -left-10 w-24 h-24 bg-amber-500 rounded-full" />
+        <div className="absolute bottom-32 left-12 w-3 h-3 bg-gray-300 rounded-full" />
+        <div className="absolute top-1/4 right-16 w-2.5 h-2.5 bg-gray-300 rounded-full" />
+        <div className="absolute top-1/3 right-28 w-1.5 h-1.5 bg-gray-300 rounded-full" />
+      </div>
 
-        <div className={`relative w-full max-w-md transition-all duration-200 ${shake ? 'animate-shake' : ''}`}>
-          <div className="bg-white rounded-3xl shadow-2xl shadow-black/40 overflow-hidden">
+      <div className="relative z-10 w-full max-w-md flex flex-col items-center gap-5">
+        <div className={`w-full bg-white rounded-3xl shadow-2xl shadow-black/10 overflow-hidden transition-all duration-200 ${shake ? 'animate-shake' : ''}`}>
             <div className="px-8 pt-8 pb-2">
               <div className="flex items-center gap-2.5 mb-1">
                 <img src={invobukLogoShort} alt="Invobuk" className="h-10 w-10 object-contain rounded-xl" />
@@ -150,22 +150,21 @@ export default function Login() {
             <div className="px-8 pb-6 text-center">
               <p className="text-xs text-gray-400">© {new Date().getFullYear()} NesVed. All rights reserved.</p>
             </div>
-          </div>
         </div>
-      </div>
 
-      {/* Feature strip */}
-      <div className="bg-brand-900 px-6 pb-8 pt-2">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {FEATURES.map(f => (
-            <div key={f.title} className="bg-brand-800/60 border border-brand-700/50 rounded-2xl p-4">
-              <div className="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center mb-3">
-                <f.icon className="w-4.5 h-4.5 text-white" />
+        {/* Feature strip */}
+        <div className="w-full bg-brand-800 rounded-3xl p-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {FEATURES.map(f => (
+              <div key={f.title}>
+                <div className="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center mb-2.5">
+                  <f.icon className="w-4.5 h-4.5 text-white" />
+                </div>
+                <p className="text-white text-xs font-semibold leading-tight">{f.title}</p>
+                <p className="text-brand-300 text-[11px] mt-0.5 leading-snug">{f.desc}</p>
               </div>
-              <p className="text-white text-sm font-semibold">{f.title}</p>
-              <p className="text-brand-300 text-xs mt-0.5">{f.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
