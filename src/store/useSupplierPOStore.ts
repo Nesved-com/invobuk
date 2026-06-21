@@ -1,8 +1,9 @@
-import { electronStorage } from '@/lib/electronStorage'
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { v4 as uuidv4 } from 'uuid'
 import { getFinancialYear } from '@/lib/utils'
+import { dbGetAll, dbUpsert, dbDelete, migrateLegacyArrayIfNeeded } from '@/lib/sqliteStorage'
+
+const TABLE = 'supplier_pos'
 
 export interface SupplierPOItem {
   id: string
@@ -52,33 +53,51 @@ export interface SupplierPO {
 
 interface SupplierPOStore {
   orders: SupplierPO[]
+  loaded: boolean
+  init: () => Promise<void>
   addOrder: (order: Omit<SupplierPO, 'id' | 'number' | 'createdAt'>) => SupplierPO
   updateOrder: (id: string, data: Partial<SupplierPO>) => void
   deleteOrder: (id: string) => void
 }
 
-export const useSupplierPOStore = create<SupplierPOStore>()(
-  persist(
-    (set, get) => ({
-      orders: [],
-      addOrder: (order) => {
-        const count = get().orders.length
-        const newOrder: SupplierPO = {
-          ...order,
-          id: uuidv4(),
-          number: `PO-${getFinancialYear()}-${String(count + 1).padStart(2, '0')}`,
-          createdAt: new Date().toISOString(),
-        }
-        set((state) => ({ orders: [newOrder, ...state.orders] }))
-        return newOrder
-      },
-      updateOrder: (id, data) =>
-        set((state) => ({
-          orders: state.orders.map((o) => (o.id === id ? { ...o, ...data } : o)),
-        })),
-      deleteOrder: (id) =>
-        set((state) => ({ orders: state.orders.filter((o) => o.id !== id) })),
-    }),
-    { name: 'billing-supplier-po-v1', storage: electronStorage }
-  )
-)
+export const useSupplierPOStore = create<SupplierPOStore>()((set, get) => ({
+  orders: [],
+  loaded: false,
+
+  init: async () => {
+    if (get().loaded) return
+    await migrateLegacyArrayIfNeeded<SupplierPO>('billing-supplier-po-v1', TABLE, (parsed) => parsed?.state?.orders)
+    const orders = await dbGetAll<SupplierPO>(TABLE)
+    set({ orders, loaded: true })
+  },
+
+  addOrder: (order) => {
+    const count = get().orders.length
+    const newOrder: SupplierPO = {
+      ...order,
+      id: uuidv4(),
+      number: `PO-${getFinancialYear()}-${String(count + 1).padStart(2, '0')}`,
+      createdAt: new Date().toISOString(),
+    }
+    set((state) => ({ orders: [newOrder, ...state.orders] }))
+    dbUpsert(TABLE, newOrder)
+    return newOrder
+  },
+
+  updateOrder: (id, data) => {
+    let updated: SupplierPO | undefined
+    set((state) => ({
+      orders: state.orders.map((o) => {
+        if (o.id !== id) return o
+        updated = { ...o, ...data }
+        return updated
+      }),
+    }))
+    if (updated) dbUpsert(TABLE, updated)
+  },
+
+  deleteOrder: (id) => {
+    set((state) => ({ orders: state.orders.filter((o) => o.id !== id) }))
+    dbDelete(TABLE, id)
+  },
+}))

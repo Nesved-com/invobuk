@@ -84,10 +84,10 @@ async function findBackupFileId(): Promise<string | null> {
   return data.files?.[0]?.id ?? null
 }
 
+const SQLITE_TABLES = ['invoices', 'quotations', 'purchase_orders', 'supplier_pos', 'delivery_challans']
+
 export async function collectAllData(): Promise<Record<string, any>> {
   const keys = [
-    'billing-quotations',
-    'billing-purchase-orders',
     'billing-products-v2',
     'billing-customers-v2',
     'billing-company',
@@ -98,8 +98,11 @@ export async function collectAllData(): Promise<Record<string, any>> {
     const val = localStorage.getItem(k)
     if (val) result[k] = JSON.parse(val)
   }
-  // Invoices live in SQLite now (not the JSON-file stores above) — include them separately.
-  result['sqlite-invoices'] = await dbGetAll('invoices')
+  // Transactional documents (invoices, quotations, purchase orders, etc.) live in
+  // SQLite, not the JSON-file stores above — include each table separately.
+  for (const table of SQLITE_TABLES) {
+    result[`sqlite-${table}`] = await dbGetAll(table)
+  }
   return result
 }
 
@@ -150,8 +153,9 @@ export async function downloadBackup(): Promise<Record<string, any> | null> {
 export async function restoreFromBackup(backup: Record<string, any>): Promise<void> {
   const data = backup.data ?? backup
   for (const [key, value] of Object.entries(data)) {
-    if (key === 'sqlite-invoices') {
-      if (Array.isArray(value) && value.length > 0) await dbBulkInsert('invoices', value)
+    if (key.startsWith('sqlite-')) {
+      const table = key.slice('sqlite-'.length)
+      if (Array.isArray(value) && value.length > 0) await dbBulkInsert(table, value)
       continue
     }
     localStorage.setItem(key, JSON.stringify(value))

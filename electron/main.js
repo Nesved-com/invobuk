@@ -11,47 +11,16 @@ function getMachineId() {
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
 
-// electron-store v11+ is ESM-only; use dynamic import.
-// Each Zustand store on the renderer side calls persist() with its own unique
-// name (e.g. "billing-invoices-v1", "billing-customers-v2"). We give each of
-// those names its own electron-store instance, so each menu/data-domain gets
-// its own JSON file instead of one giant combined file:
-//   C:\Users\<Name>\AppData\Roaming\Invobuk\billing-invoices-v1.json
-//   C:\Users\<Name>\AppData\Roaming\Invobuk\billing-customers-v2.json
-//   ...etc, one per store.
-const stores = new Map()
-
-async function getStore(name) {
-  if (!stores.has(name)) {
-    const { default: Store } = await import('electron-store')
-    stores.set(name, new Store({ name }))
-  }
-  return stores.get(name)
-}
-
-// IPC handlers — called from renderer via preload.js
-ipcMain.handle('store-get', async (_event, key) => {
-  const store = await getStore(key)
-  return store.get('data', null)
-})
-
-ipcMain.handle('store-set', async (_event, key, value) => {
-  const store = await getStore(key)
-  store.set('data', value)
-})
-
-ipcMain.handle('store-delete', async (_event, key) => {
-  const store = await getStore(key)
-  store.delete('data')
-})
-
-ipcMain.handle('get-machine-id', () => getMachineId())
-
-// ─── SQLite-backed tables (for data that can grow large, e.g. invoices) ─────
-// Each "table" is one row per record: id (PK), data (full record as JSON),
-// createdAt (indexed, for fast sorted listing). Unlike the JSON-file stores
-// above, a save here only touches the one changed row — no full-file rewrite
-// as the table grows, and startup doesn't need to parse the whole dataset.
+// Everything is stored in one SQLite file (invobuk.db) — no JSON files at all.
+//   C:\Users\<Name>\AppData\Roaming\Invobuk\invobuk.db
+//
+// Two kinds of tables:
+//  - kv_store: one row per Zustand "store name" holding its whole persisted
+//    blob (used by Company/Auth/License/User/Customers/Products/etc — small,
+//    config-shaped stores where a single blob is simplest).
+//  - tbl_<name>: one row PER RECORD (used by Invoices/Quotations/Purchase
+//    Orders/etc — data that grows per-transaction and benefits from a save
+//    only touching the one changed row instead of rewriting everything).
 let db
 
 function getDb() {
@@ -59,9 +28,50 @@ function getDb() {
     const dbPath = path.join(app.getPath('userData'), 'invobuk.db')
     db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
+    db.exec(`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT)`)
   }
   return db
 }
+
+// Migrates a legacy electron-store JSON file (named "<key>.json") into kv_store,
+// once, the first time that key is read and kv_store doesn't have it yet.
+// Note: the value stored under electron-store's 'data' key is already a JSON
+// *string* (electronStorage.ts on the renderer side stringifies before calling
+// es.set) — store it as-is, don't re-stringify.
+async function migrateLegacyJsonFile(key) {
+  try {
+    const { default: Store } = await import('electron-store')
+    const legacy = new Store({ name: key })
+    const value = legacy.get('data', null)
+    if (typeof value === 'string') {
+      getDb().prepare('INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)').run(key, value)
+    }
+  } catch {
+    // No legacy file for this key (fresh install) — nothing to migrate.
+  }
+}
+
+// IPC handlers — called from renderer via preload.js.
+// value/return here is always the raw JSON *string* electronStorage.ts already
+// produced/expects — we just store and return it as-is, no extra (de)serializing.
+ipcMain.handle('store-get', async (_event, key) => {
+  let row = getDb().prepare('SELECT value FROM kv_store WHERE key = ?').get(key)
+  if (!row) {
+    await migrateLegacyJsonFile(key)
+    row = getDb().prepare('SELECT value FROM kv_store WHERE key = ?').get(key)
+  }
+  return row ? row.value : null
+})
+
+ipcMain.handle('store-set', (_event, key, value) => {
+  getDb().prepare('INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)').run(key, value)
+})
+
+ipcMain.handle('store-delete', (_event, key) => {
+  getDb().prepare('DELETE FROM kv_store WHERE key = ?').run(key)
+})
+
+ipcMain.handle('get-machine-id', () => getMachineId())
 
 function ensureTable(tableName) {
   const name = tableName.replace(/[^a-zA-Z0-9_]/g, '')

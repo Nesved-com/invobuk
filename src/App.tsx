@@ -4,6 +4,10 @@ import { Toaster } from 'sonner'
 import { useAuthStore } from './store/useAuthStore'
 import { useLicenseStore } from './store/useLicenseStore'
 import { useInvoiceStore } from './store/useInvoiceStore'
+import { useQuotationStore } from './store/useQuotationStore'
+import { usePurchaseOrderStore } from './store/usePurchaseOrderStore'
+import { useSupplierPOStore } from './store/useSupplierPOStore'
+import { useDeliveryChallanStore } from './store/useDeliveryChallanStore'
 import { activateLicense, daysUntil } from './lib/license'
 import { ConfirmDialogProvider } from './components/ui/confirm-dialog'
 import LicenseActivation from './pages/LicenseActivation'
@@ -38,9 +42,19 @@ export default function App() {
   const { isLoggedIn } = useAuthStore()
   const license = useLicenseStore()
   const invoicesLoaded = useInvoiceStore((s) => s.loaded)
+  const quotationsLoaded = useQuotationStore((s) => s.loaded)
+  const purchaseOrdersLoaded = usePurchaseOrderStore((s) => s.loaded)
+  const supplierPOsLoaded = useSupplierPOStore((s) => s.loaded)
+  const challansLoaded = useDeliveryChallanStore((s) => s.loaded)
+  const allDataLoaded = invoicesLoaded && quotationsLoaded && purchaseOrdersLoaded && supplierPOsLoaded && challansLoaded
 
   useEffect(() => {
-    if (isLoggedIn) useInvoiceStore.getState().init()
+    if (!isLoggedIn) return
+    useInvoiceStore.getState().init()
+    useQuotationStore.getState().init()
+    usePurchaseOrderStore.getState().init()
+    useSupplierPOStore.getState().init()
+    useDeliveryChallanStore.getState().init()
   }, [isLoggedIn])
 
   // Hard local check: a previously-valid key may have simply lapsed since activation.
@@ -86,7 +100,7 @@ export default function App() {
     )
   }
 
-  if (!invoicesLoaded) {
+  if (!allDataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Toaster position="top-right" richColors />
