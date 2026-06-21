@@ -35,8 +35,11 @@
       "shortcutName": "Invobuk"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
-      "icon": "src/assets/invobuk-logo-short.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/icon-512.png",
       "category": "Office",
       "maintainer": "NesVed <contact@nesved.com>"
     },
