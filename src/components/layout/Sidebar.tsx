@@ -88,7 +88,7 @@ export default function Sidebar() {
       {/* About & License / Lock+Logout */}
       <div className={cn('px-2.5 pb-3 pt-2 space-y-1 border-t border-brand-800', collapsed && 'px-2')}>
         <NavLink
-          to="/settings?section=about-license"
+          to="/about-license"
           className={({ isActive }) =>
             cn(
               'flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',

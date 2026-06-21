@@ -16,6 +16,7 @@ const pageTitles: Record<string, string> = {
   '/delivery-challans': 'Delivery Challans',
   '/delivery-challans/new': 'Create Delivery Challan',
   '/settings': 'Company Settings',
+  '/about-license': 'About & License',
 }
 
 export default function Layout() {
