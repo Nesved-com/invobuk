@@ -23,6 +23,8 @@ jobs:
         run: npm ci
 
       - name: Build app and installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run electron:build
 
       - name: Find installer file
@@ -59,6 +61,8 @@ jobs:
         run: npm ci
 
       - name: Build app and Linux packages (AppImage + deb)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run electron:build:linux
 
       - name: Find installer files
