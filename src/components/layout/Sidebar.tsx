@@ -13,6 +13,8 @@ import {
   LogOut,
   Truck,
   ShieldCheck,
+  UserCircle,
+  Building2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -29,6 +31,8 @@ const navItems = [
   { to: '/incoming-purchase-orders', label: 'Incoming Purchase Order', icon: Package },
   { to: '/delivery-challans', label: 'Delivery Challans', icon: Truck },
   { to: '/shipping-addresses', label: 'Ship Addresses', icon: MapPin },
+  { to: '/profile', label: 'Profile', icon: UserCircle },
+  { to: '/company-info', label: 'Company Info', icon: Building2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

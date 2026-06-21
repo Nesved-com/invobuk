@@ -25,6 +25,8 @@ import PurchaseOrderCreate from './pages/PurchaseOrderCreate'
 import PurchaseOrderView from './pages/PurchaseOrderView'
 import PurchaseOrderEdit from './pages/PurchaseOrderEdit'
 import Settings from './pages/Settings'
+import Profile from './pages/Profile'
+import CompanyInfo from './pages/CompanyInfo'
 import AboutLicense from './pages/AboutLicense'
 import ShippingAddresses from './pages/ShippingAddresses'
 import SupplierPurchaseOrders from './pages/SupplierPurchaseOrders'
@@ -105,6 +107,8 @@ export default function App() {
             <Route path="/delivery-challans/new" element={<DeliveryChallanForm />} />
             <Route path="/delivery-challans/:id/edit" element={<DeliveryChallanForm />} />
             <Route path="/shipping-addresses" element={<ShippingAddresses />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/company-info" element={<CompanyInfo />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/about-license" element={<AboutLicense />} />
           </Route>
