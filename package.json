@@ -90,7 +90,7 @@
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "electron": "^33.4.11",
-    "electron-builder": "^26.15.2",
+    "electron-builder": "^26.15.5",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.2.2",
@@ -99,6 +99,6 @@
   },
   "overrides": {
     "@noble/hashes": "^1.4.0",
-    "@electron/get": "^2.0.3"
+    "@electron/get": "3.1.0"
   }
 }
