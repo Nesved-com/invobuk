@@ -1,58 +1,46 @@
 import { dbGetAll, dbBulkInsert } from '@/lib/sqliteStorage'
 
 const DRIVE_FILE_NAME = 'renuka-billing-backup.json'
-const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file'
 
-let tokenClient: any = null
 let accessToken: string | null = null
 
-declare global {
-  interface Window {
-    google: any
-    gapi: any
+interface GoogleAuthBridge {
+  start: (clientId: string, clientSecret: string) => Promise<{ access_token?: string; refresh_token?: string; error?: string; error_description?: string }>
+  refresh: (clientId: string, clientSecret: string, refreshToken: string) => Promise<{ access_token?: string; error?: string; error_description?: string }>
+}
+
+function getAuthBridge(): GoogleAuthBridge {
+  const bridge = (window as any).electronGoogleAuth
+  if (!bridge) throw new Error('Google sign-in is only available in the desktop app.')
+  return bridge
+}
+
+/**
+ * Opens the system browser for the user to sign in to Google, since Google
+ * blocks OAuth inside embedded browsers like Electron's BrowserWindow. Returns
+ * the access token (for immediate use) and a refresh token (to persist, so
+ * future sessions/background sync don't need to re-prompt the user).
+ */
+export async function startGoogleAuth(clientId: string, clientSecret: string): Promise<{ accessToken: string; refreshToken?: string }> {
+  const result = await getAuthBridge().start(clientId, clientSecret)
+  if (result.error || !result.access_token) {
+    throw new Error(result.error_description || result.error || 'Sign-in failed')
   }
+  accessToken = result.access_token
+  return { accessToken: result.access_token, refreshToken: result.refresh_token }
 }
 
-function loadScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
-    const s = document.createElement('script')
-    s.src = src
-    s.onload = () => resolve()
-    s.onerror = reject
-    document.head.appendChild(s)
-  })
-}
-
-export async function initGoogleDrive(clientId: string): Promise<void> {
-  await Promise.all([
-    loadScript('https://accounts.google.com/gsi/client'),
-    loadScript('https://apis.google.com/js/api.js'),
-  ])
-
-  await new Promise<void>((resolve) => window.gapi.load('client', resolve))
-  await window.gapi.client.init({ discoveryDocs: [DISCOVERY_DOC] })
-
-  tokenClient = window.google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: SCOPES,
-    callback: (resp: any) => {
-      if (resp.access_token) accessToken = resp.access_token
-    },
-  })
-}
-
-export function requestAccessToken(forceAccountSelect = false): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!tokenClient) { reject(new Error('Not initialized')); return }
-    tokenClient.callback = (resp: any) => {
-      if (resp.error) { reject(new Error(resp.error)); return }
-      accessToken = resp.access_token
-      resolve(resp.access_token)
-    }
-    tokenClient.requestAccessToken({ prompt: forceAccountSelect ? 'select_account' : '' })
-  })
+/** Silently gets a fresh access token from a previously-saved refresh token — no browser prompt. */
+export async function restoreGoogleSession(clientId: string, clientSecret: string, refreshToken: string): Promise<boolean> {
+  if (!clientId || !clientSecret || !refreshToken) return false
+  try {
+    const result = await getAuthBridge().refresh(clientId, clientSecret, refreshToken)
+    if (result.error || !result.access_token) return false
+    accessToken = result.access_token
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function getConnectedEmail(): Promise<string> {
@@ -69,9 +57,6 @@ export function isSignedIn(): boolean {
 }
 
 export function signOut() {
-  if (accessToken) {
-    window.google?.accounts.oauth2.revoke(accessToken)
-  }
   accessToken = null
 }
 
@@ -106,6 +91,32 @@ export async function collectAllData(): Promise<Record<string, any>> {
   return result
 }
 
+async function readDriveError(res: Response): Promise<string> {
+  try {
+    const body = await res.json()
+    return body?.error?.message || body?.error_description || `${res.status} ${res.statusText}`
+  } catch {
+    return `${res.status} ${res.statusText}`
+  }
+}
+
+async function uploadOnce(blob: Blob, existingId: string | null): Promise<Response> {
+  const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
+  const form = new FormData()
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+  form.append('file', blob)
+
+  const url = existingId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
+
+  return fetch(url, {
+    method: existingId ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  })
+}
+
 export async function uploadBackup(): Promise<void> {
   if (!accessToken) throw new Error('Not signed in to Google')
 
@@ -117,23 +128,16 @@ export async function uploadBackup(): Promise<void> {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
 
   const existingId = await findBackupFileId()
+  let res = await uploadOnce(blob, existingId)
 
-  const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
-  const form = new FormData()
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-  form.append('file', blob)
+  // The existing backup file may have been created under a different/older OAuth
+  // client (e.g. before switching Client IDs) and no longer be accessible to this
+  // one under the `drive.file` per-file scope — fall back to creating a fresh file.
+  if (!res.ok && existingId && (res.status === 403 || res.status === 404)) {
+    res = await uploadOnce(blob, null)
+  }
 
-  const url = existingId
-    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
-    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
-
-  const res = await fetch(url, {
-    method: existingId ? 'PATCH' : 'POST',
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: form,
-  })
-
-  if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Upload failed: ${await readDriveError(res)}`)
 }
 
 export async function downloadBackup(): Promise<Record<string, any> | null> {

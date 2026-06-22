@@ -66,7 +66,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.303.0",
-    "pdfjs-dist": "^6.0.227",
+    "pdfjs-dist": "^4.10.38",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-day-picker": "^10.0.1",
@@ -89,7 +89,7 @@
     "autoprefixer": "^10.4.16",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "electron": "^42.4.0",
+    "electron": "^33.4.11",
     "electron-builder": "^26.15.2",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
@@ -98,6 +98,7 @@
     "wait-on": "^9.0.10"
   },
   "overrides": {
-    "@noble/hashes": "^1.4.0"
+    "@noble/hashes": "^1.4.0",
+    "@electron/get": "^2.0.3"
   }
 }

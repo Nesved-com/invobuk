@@ -3,7 +3,7 @@ import { Save, Cloud, CloudOff, RefreshCw, Download, CheckCircle, AlertCircle } 
 import { toast } from 'sonner'
 import { useCompanyStore } from '@/store/useCompanyStore'
 import { useSyncStore } from '@/store/useSyncStore'
-import { initGoogleDrive, requestAccessToken, isSignedIn, signOut, uploadBackup, downloadBackup, restoreFromBackup, getConnectedEmail } from '@/lib/googleDriveSync'
+import { startGoogleAuth, restoreGoogleSession, signOut, uploadBackup, downloadBackup, restoreFromBackup, getConnectedEmail } from '@/lib/googleDriveSync'
 import type { Company } from '@/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -18,16 +18,25 @@ export default function Settings() {
 
   const sync = useSyncStore()
   const [clientIdInput, setClientIdInput] = useState(sync.googleClientId)
+  const [clientSecretInput, setClientSecretInput] = useState(sync.googleClientSecret)
   const [driveSignedIn, setDriveSignedIn] = useState(false)
   const [connectedEmail, setConnectedEmail] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const autoSyncTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Init Drive SDK when clientId changes
+  // On load, if we have a saved refresh token, silently restore the session
+  // (no browser prompt) so auto-sync keeps working across app restarts.
   useEffect(() => {
-    if (!sync.googleClientId) return
-    initGoogleDrive(sync.googleClientId).catch(() => {})
-  }, [sync.googleClientId])
+    if (!sync.googleClientId || !sync.googleClientSecret || !sync.googleRefreshToken) return
+    restoreGoogleSession(sync.googleClientId, sync.googleClientSecret, sync.googleRefreshToken).then(async (ok) => {
+      if (ok) {
+        const email = await getConnectedEmail()
+        setConnectedEmail(email)
+        setDriveSignedIn(true)
+      }
+    })
+  }, [])
 
   // Auto-sync interval
   useEffect(() => {
@@ -45,12 +54,15 @@ export default function Settings() {
     return () => { if (autoSyncTimer.current) clearInterval(autoSyncTimer.current) }
   }, [sync.autoSync, sync.syncEnabled, driveSignedIn, sync.autoSyncIntervalMinutes])
 
-  const handleConnectDrive = async () => {
-    if (!clientIdInput.trim()) { toast.error('Enter your Google Client ID first'); return }
+  const connectGoogle = async () => {
+    if (!clientIdInput.trim() || !clientSecretInput.trim()) { toast.error('Enter your Google Client ID and Client Secret first'); return }
     sync.setGoogleClientId(clientIdInput.trim())
+    sync.setGoogleClientSecret(clientSecretInput.trim())
+    setConnecting(true)
     try {
-      await initGoogleDrive(clientIdInput.trim())
-      await requestAccessToken()
+      // Opens your system browser to sign in (Google blocks sign-in inside the app's own window).
+      const { refreshToken } = await startGoogleAuth(clientIdInput.trim(), clientSecretInput.trim())
+      if (refreshToken) sync.setGoogleRefreshToken(refreshToken)
       const email = await getConnectedEmail()
       setConnectedEmail(email)
       setDriveSignedIn(true)
@@ -58,8 +70,13 @@ export default function Settings() {
       toast.success(`Connected as ${email || 'Google account'}!`)
     } catch (e: any) {
       toast.error('Connection failed: ' + e.message)
+    } finally {
+      setConnecting(false)
     }
   }
+
+  const handleConnectDrive = connectGoogle
+  const handleSwitchAccount = connectGoogle // same flow — the system browser's account picker lets you pick a different account
 
   const handleDisconnect = () => {
     signOut()
@@ -67,20 +84,8 @@ export default function Settings() {
     setConnectedEmail('')
     sync.setSyncEnabled(false)
     sync.setAutoSync(false)
+    sync.setGoogleRefreshToken('')
     toast.success('Disconnected from Google Drive')
-  }
-
-  const handleSwitchAccount = async () => {
-    try {
-      await requestAccessToken(true) // force account picker
-      const email = await getConnectedEmail()
-      setConnectedEmail(email)
-      setDriveSignedIn(true)
-      sync.setSyncEnabled(true)
-      toast.success(`Switched to ${email}`)
-    } catch (e: any) {
-      toast.error('Failed: ' + e.message)
-    }
   }
 
   const handleSyncNow = async () => {
@@ -174,25 +179,35 @@ export default function Settings() {
             </div>
           }>
           <CardBody className="space-y-4">
-            <div>
-              <label className={labelCls}>Google OAuth Client ID</label>
-              <div className="flex gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Google OAuth Client ID</label>
                 <input value={clientIdInput} onChange={e => setClientIdInput(e.target.value)}
                   placeholder="xxxx.apps.googleusercontent.com"
                   className={inputCls + ' font-mono text-xs'} disabled={driveSignedIn} />
-                {!driveSignedIn ? (
-                  <Button type="button" onClick={handleConnectDrive} leftIcon={<Cloud className="w-4 h-4" />} className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 shadow-blue-100">Connect</Button>
-                ) : (
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button type="button" variant="secondary" onClick={handleSwitchAccount}>Switch Account</Button>
-                    <Button type="button" variant="secondary" onClick={handleDisconnect} leftIcon={<CloudOff className="w-4 h-4" />}>Disconnect</Button>
-                  </div>
-                )}
               </div>
-              <p className="text-xs text-gray-400 mt-1.5">
-                Need a Client ID? <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-500 underline">Google Cloud Console</a> → Enable Drive API → OAuth 2.0 Client ID → add <code className="bg-gray-100 px-1 rounded">http://localhost</code> as origin.
-              </p>
+              <div>
+                <label className={labelCls}>Google OAuth Client Secret</label>
+                <input type="password" value={clientSecretInput} onChange={e => setClientSecretInput(e.target.value)}
+                  placeholder="GOCSPX-..."
+                  className={inputCls + ' font-mono text-xs'} disabled={driveSignedIn} />
+              </div>
             </div>
+            <div className="flex gap-2">
+              {!driveSignedIn ? (
+                <Button type="button" onClick={handleConnectDrive} loading={connecting} leftIcon={<Cloud className="w-4 h-4" />} className="bg-blue-600 hover:bg-blue-700 shadow-blue-100">
+                  {connecting ? 'Opening browser…' : 'Connect'}
+                </Button>
+              ) : (
+                <>
+                  <Button type="button" variant="secondary" onClick={handleSwitchAccount} loading={connecting}>Switch Account</Button>
+                  <Button type="button" variant="secondary" onClick={handleDisconnect} leftIcon={<CloudOff className="w-4 h-4" />}>Disconnect</Button>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-400">
+              Need credentials? <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-500 underline">Google Cloud Console</a> → Create Credentials → OAuth Client ID → application type <strong>"Desktop app"</strong> (not "Web application" — Google blocks sign-in inside the app window for that type). Clicking Connect opens your system browser to sign in.
+            </p>
 
             {driveSignedIn && (
               <>

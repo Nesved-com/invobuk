@@ -9,6 +9,9 @@ export interface ActivationResult {
   reason?: string
   customerName?: string
   expiresAt?: string // ISO timestamp
+  plan?: string
+  isTrial?: boolean
+  licenseKey?: string
 }
 
 export async function getMachineId(): Promise<string> {
@@ -38,6 +41,23 @@ export async function activateLicense(licenseKey: string): Promise<ActivationRes
   }
 }
 
+// Auto-starts a 3-day, no-key-required trial the first time the app is run on a
+// machine. Idempotent server-side — replaying this on the same machine just
+// returns the same trial's (possibly now-expired) status, never a fresh one.
+export async function startTrial(): Promise<ActivationResult> {
+  const machineId = await getMachineId()
+  try {
+    const res = await fetch(`${LICENSE_API_URL}/start-trial`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LICENSE_API_ANON_KEY}` },
+      body: JSON.stringify({ machineId, machineLabel: navigator.platform }),
+    })
+    return await res.json()
+  } catch {
+    return { valid: false, reason: 'Could not reach the license server. Check your internet connection and try again.' }
+  }
+}
+
 export async function deactivateLicense(licenseKey: string): Promise<{ ok: boolean; reason?: string }> {
   const machineId = await getMachineId()
   try {
@@ -45,6 +65,20 @@ export async function deactivateLicense(licenseKey: string): Promise<{ ok: boole
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LICENSE_API_ANON_KEY}` },
       body: JSON.stringify({ licenseKey: licenseKey.trim().toUpperCase(), machineId }),
+    })
+    return await res.json()
+  } catch {
+    return { ok: false, reason: 'Could not reach the license server.' }
+  }
+}
+
+export async function updateLicenseContact(licenseKey: string, email?: string, phone?: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!licenseKey || (!email && !phone)) return { ok: false, reason: 'Nothing to update' }
+  try {
+    const res = await fetch(`${LICENSE_API_URL}/update-license-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LICENSE_API_ANON_KEY}` },
+      body: JSON.stringify({ licenseKey: licenseKey.trim().toUpperCase(), email, phone }),
     })
     return await res.json()
   } catch {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { HashRouter as BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/useAuthStore'
@@ -8,7 +8,7 @@ import { useQuotationStore } from './store/useQuotationStore'
 import { usePurchaseOrderStore } from './store/usePurchaseOrderStore'
 import { useSupplierPOStore } from './store/useSupplierPOStore'
 import { useDeliveryChallanStore } from './store/useDeliveryChallanStore'
-import { activateLicense, daysUntil } from './lib/license'
+import { activateLicense, startTrial, daysUntil } from './lib/license'
 import { ConfirmDialogProvider } from './components/ui/confirm-dialog'
 import LicenseActivation from './pages/LicenseActivation'
 import Login from './pages/Login'
@@ -48,6 +48,23 @@ export default function App() {
   const challansLoaded = useDeliveryChallanStore((s) => s.loaded)
   const allDataLoaded = invoicesLoaded && quotationsLoaded && purchaseOrdersLoaded && supplierPOsLoaded && challansLoaded
 
+  const [trialAttempted, setTrialAttempted] = useState(false)
+  const [trialMessage, setTrialMessage] = useState('')
+
+  // First-ever launch on this machine: silently start a 3-day trial — no key needed.
+  // Idempotent server-side, so this is safe to attempt on every cold start until activated.
+  useEffect(() => {
+    if (license.isActivated || trialAttempted) return
+    setTrialAttempted(true)
+    startTrial().then(result => {
+      if (result.valid && result.licenseKey && result.expiresAt) {
+        license.activate(result.licenseKey, result.customerName || 'Trial User', result.expiresAt)
+      } else if (result.reason) {
+        setTrialMessage(result.reason)
+      }
+    })
+  }, [license.isActivated, trialAttempted])
+
   useEffect(() => {
     if (!isLoggedIn) return
     useInvoiceStore.getState().init()
@@ -86,7 +103,7 @@ export default function App() {
     return (
       <>
         <Toaster position="top-right" richColors />
-        <LicenseActivation />
+        <LicenseActivation trialMessage={trialMessage} />
       </>
     )
   }

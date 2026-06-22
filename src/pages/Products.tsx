@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Pencil, Trash2, Search, Package, X, Tag } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, Search, Package, X, Tag, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProductStore } from '@/store/useProductStore'
 import { formatCurrency } from '@/lib/utils'
@@ -27,6 +27,39 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Material': 'bg-gray-100 text-gray-600',
 }
 
+// Minimal CSV parser — handles quoted fields containing commas ("Some, Description").
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++ }
+        else inQuotes = false
+      } else field += ch
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      row.push(field); field = ''
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      row.push(field); field = ''
+      if (row.some(c => c.trim() !== '')) rows.push(row)
+      row = []
+    } else {
+      field += ch
+    }
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row) }
+  return rows
+}
+
+const CSV_TEMPLATE = 'Name,Description,HSN Code,Category,Rate,Unit,GST Rate\n"Smoke detector installation charges","",9987,Installation,150,Nos,18\n'
+
 export default function Products() {
   const { products, addProduct, updateProduct, deleteProduct } = useProductStore()
   const [search, setSearch] = useState('')
@@ -34,6 +67,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState(emptyProduct())
   const confirm = useConfirm()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -61,6 +95,63 @@ export default function Products() {
     }
   }
 
+  const handleDownloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'products-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const rows = parseCSV(text)
+    if (rows.length < 2) { toast.error('CSV file has no data rows'); e.target.value = ''; return }
+
+    const header = rows[0].map(h => h.trim().toLowerCase())
+    const idx = (...names: string[]) => header.findIndex(h => names.includes(h))
+    const idxContains = (...substrings: string[]) => header.findIndex(h => substrings.some(s => h.includes(s)))
+    const col = {
+      name: idx('name', 'product name', 'product / service') !== -1
+        ? idx('name', 'product name', 'product / service')
+        : idxContains('name'),
+      description: idx('description') !== -1 ? idx('description') : idxContains('desc'),
+      hsn: idxContains('hsn'),
+      category: idxContains('category'),
+      rate: idx('rate', 'price') !== -1 ? idx('rate', 'price') : idxContains('rate', 'price'),
+      unit: idx('unit', 'uom') !== -1 ? idx('unit', 'uom') : idxContains('unit', 'uom'),
+      gst: idxContains('gst'),
+    }
+
+    if (col.name === -1) {
+      toast.error('CSV must have a "Name" column')
+      e.target.value = ''
+      return
+    }
+
+    let added = 0, skipped = 0
+    for (const row of rows.slice(1)) {
+      const name = row[col.name]?.trim()
+      if (!name) { skipped++; continue }
+      addProduct({
+        name,
+        description: col.description >= 0 ? row[col.description]?.trim() || '' : '',
+        hsnCode: col.hsn >= 0 ? row[col.hsn]?.trim() || '' : '',
+        category: col.category >= 0 ? row[col.category]?.trim() || '' : '',
+        rate: col.rate >= 0 ? parseFloat(row[col.rate]) || 0 : 0,
+        unit: col.unit >= 0 ? row[col.unit]?.trim() || 'Nos' : 'Nos',
+        gstRate: col.gst >= 0 ? parseFloat(row[col.gst]) || 0 : 18,
+      })
+      added++
+    }
+
+    toast.success(`Imported ${added} product${added !== 1 ? 's' : ''}${skipped ? ` (${skipped} row(s) skipped — missing name)` : ''}`)
+    e.target.value = ''
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -74,6 +165,9 @@ export default function Products() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
               className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-56" />
           </div>
+          <Button variant="secondary" onClick={handleDownloadTemplate} leftIcon={<Download className="w-4 h-4" />}>Template</Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()} leftIcon={<Upload className="w-4 h-4" />}>Import CSV</Button>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
           <Button onClick={openCreate} leftIcon={<Plus className="w-4 h-4" />}>Add Product</Button>
         </div>
       </div>

@@ -17,3 +17,8 @@ contextBridge.exposeInMainWorld('electronDB', {
   bulkInsert: (table, rows)   => ipcRenderer.invoke('db-bulk-insert', table, rows),
   count:      (table)         => ipcRenderer.invoke('db-count', table),
 })
+
+contextBridge.exposeInMainWorld('electronGoogleAuth', {
+  start:   (clientId, clientSecret) => ipcRenderer.invoke('google-oauth-start', clientId, clientSecret),
+  refresh: (clientId, clientSecret, refreshToken) => ipcRenderer.invoke('google-oauth-refresh', clientId, clientSecret, refreshToken),
+})

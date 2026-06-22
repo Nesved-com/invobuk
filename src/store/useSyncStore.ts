@@ -4,6 +4,8 @@ import { persist } from 'zustand/middleware'
 
 interface SyncStore {
   googleClientId: string
+  googleClientSecret: string
+  googleRefreshToken: string
   syncEnabled: boolean
   autoSync: boolean
   autoSyncIntervalMinutes: number
@@ -11,6 +13,8 @@ interface SyncStore {
   lastSyncStatus: 'success' | 'error' | null
   lastSyncError: string | null
   setGoogleClientId: (id: string) => void
+  setGoogleClientSecret: (secret: string) => void
+  setGoogleRefreshToken: (token: string) => void
   setSyncEnabled: (v: boolean) => void
   setAutoSync: (v: boolean) => void
   setAutoSyncInterval: (mins: number) => void
@@ -21,6 +25,8 @@ export const useSyncStore = create<SyncStore>()(
   persist(
     (set) => ({
       googleClientId: '',
+      googleClientSecret: '',
+      googleRefreshToken: '',
       syncEnabled: false,
       autoSync: false,
       autoSyncIntervalMinutes: 30,
@@ -28,6 +34,8 @@ export const useSyncStore = create<SyncStore>()(
       lastSyncStatus: null,
       lastSyncError: null,
       setGoogleClientId: (googleClientId) => set({ googleClientId }),
+      setGoogleClientSecret: (googleClientSecret) => set({ googleClientSecret }),
+      setGoogleRefreshToken: (googleRefreshToken) => set({ googleRefreshToken }),
       setSyncEnabled: (syncEnabled) => set({ syncEnabled }),
       setAutoSync: (autoSync) => set({ autoSync }),
       setAutoSyncInterval: (autoSyncIntervalMinutes) => set({ autoSyncIntervalMinutes }),

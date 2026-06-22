@@ -3,20 +3,29 @@ import { Save, Lock, UserCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore, hashPassword } from '@/store/useAuthStore'
 import { useUserStore } from '@/store/useUserStore'
+import { useLicenseStore } from '@/store/useLicenseStore'
+import { updateLicenseContact } from '@/lib/license'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 
 export default function Profile() {
-  const { firstName, lastName, setUser } = useUserStore()
+  const { firstName, lastName, email, phone, setUser } = useUserStore()
+  const license = useLicenseStore()
   const [profileFirstName, setProfileFirstName] = useState(firstName)
   const [profileLastName, setProfileLastName] = useState(lastName)
+  const [profileEmail, setProfileEmail] = useState(email)
+  const [profilePhone, setProfilePhone] = useState(phone)
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault()
     if (!profileFirstName.trim()) { toast.error('First name is required'); return }
-    setUser(profileFirstName.trim(), profileLastName.trim())
+    setUser(profileFirstName.trim(), profileLastName.trim(), profileEmail.trim(), profilePhone.trim())
     toast.success('Profile saved successfully!')
+
+    if (license.licenseKey && (profileEmail.trim() || profilePhone.trim())) {
+      updateLicenseContact(license.licenseKey, profileEmail.trim() || undefined, profilePhone.trim() || undefined)
+    }
   }
 
   const auth = useAuthStore()
@@ -56,6 +65,8 @@ export default function Profile() {
             <CardBody className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="First Name *" value={profileFirstName} onChange={e => setProfileFirstName(e.target.value)} required placeholder="John" />
               <Input label="Last Name" value={profileLastName} onChange={e => setProfileLastName(e.target.value)} placeholder="Doe" />
+              <Input label="Email" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="you@example.com" />
+              <Input label="Phone" type="tel" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="+91 98765 43210" />
               <div className="sm:col-span-2 flex justify-end">
                 <Button type="submit" leftIcon={<Save className="w-4 h-4" />}>Save Profile</Button>
               </div>

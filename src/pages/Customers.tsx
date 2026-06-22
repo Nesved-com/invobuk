@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Pencil, Trash2, Search, Users, X, Building2 } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, Search, Users, X, Building2, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCustomerStore } from '@/store/useCustomerStore'
 import type { Customer } from '@/types'
@@ -33,12 +33,46 @@ const INDIAN_STATES = [
   { name: 'West Bengal', code: '19' },
 ]
 
+// Minimal CSV parser — handles quoted fields containing commas ("Some, Address").
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++ }
+        else inQuotes = false
+      } else field += ch
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      row.push(field); field = ''
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      row.push(field); field = ''
+      if (row.some(c => c.trim() !== '')) rows.push(row)
+      row = []
+    } else {
+      field += ch
+    }
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row) }
+  return rows
+}
+
+const CSV_TEMPLATE = 'Name,Address,GSTIN,Vendor Code,State,Phone\n"Sterlite Technologies Limited","Plot No. AL-23, MIDC, Aurangabad",27AAECS8719B1ZC,VND-001,Maharashtra,+91 98765 43210\n'
+
 export default function Customers() {
   const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore()
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [form, setForm] = useState(empty())
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
 
   const filtered = customers.filter(c =>
@@ -67,6 +101,64 @@ export default function Customers() {
     }
   }
 
+  const handleDownloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'customers-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const rows = parseCSV(text)
+    if (rows.length < 2) { toast.error('CSV file has no data rows'); e.target.value = ''; return }
+
+    const header = rows[0].map(h => h.trim().toLowerCase())
+    const idx = (...names: string[]) => header.findIndex(h => names.includes(h))
+    const idxContains = (...substrings: string[]) => header.findIndex(h => substrings.some(s => h.includes(s)))
+    const col = {
+      name: idx('name', 'customer name', 'company name') !== -1
+        ? idx('name', 'customer name', 'company name')
+        : idxContains('name'),
+      address: idxContains('address'),
+      gst: idxContains('gst'),
+      vendor: idxContains('vendor'),
+      state: idxContains('state'),
+      phone: idxContains('phone', 'mobile'),
+    }
+
+    if (col.name === -1) {
+      toast.error('CSV must have a "Name" column')
+      e.target.value = ''
+      return
+    }
+
+    let added = 0, skipped = 0
+    for (const row of rows.slice(1)) {
+      const name = row[col.name]?.trim()
+      if (!name) { skipped++; continue }
+      const stateName = col.state >= 0 ? row[col.state]?.trim() || '' : ''
+      const stateInfo = INDIAN_STATES.find(s => s.name.toLowerCase() === stateName.toLowerCase())
+      addCustomer({
+        name,
+        address: col.address >= 0 ? row[col.address]?.trim() || '' : '',
+        gstNumber: col.gst >= 0 ? row[col.gst]?.trim().toUpperCase() || '' : '',
+        vendorCode: col.vendor >= 0 ? row[col.vendor]?.trim() || '' : '',
+        state: stateInfo?.name || stateName,
+        stateCode: stateInfo?.code || '',
+        phone: col.phone >= 0 ? row[col.phone]?.trim() || '' : '',
+      })
+      added++
+    }
+
+    toast.success(`Imported ${added} customer${added !== 1 ? 's' : ''}${skipped ? ` (${skipped} row(s) skipped — missing name)` : ''}`)
+    e.target.value = ''
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -80,6 +172,9 @@ export default function Customers() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, GSTIN…"
               className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-60" />
           </div>
+          <Button variant="secondary" onClick={handleDownloadTemplate} leftIcon={<Download className="w-4 h-4" />}>Template</Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()} leftIcon={<Upload className="w-4 h-4" />}>Import CSV</Button>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
           <Button onClick={openCreate} leftIcon={<Plus className="w-4 h-4" />}>Add Customer</Button>
         </div>
       </div>
