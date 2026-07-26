@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HashRouter as BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
+import { fetchLatestRelease, isNewerVersion, CURRENT_APP_VERSION } from './lib/appUpdate'
 import { useAuthStore } from './store/useAuthStore'
 import { useLicenseStore } from './store/useLicenseStore'
 import { useInvoiceStore } from './store/useInvoiceStore'
@@ -49,14 +50,17 @@ export default function App() {
   const challansLoaded = useDeliveryChallanStore((s) => s.loaded)
   const allDataLoaded = invoicesLoaded && quotationsLoaded && purchaseOrdersLoaded && supplierPOsLoaded && challansLoaded
 
-  const [trialAttempted, setTrialAttempted] = useState(false)
+  // A ref (not state) so the guard below updates synchronously — with useState, two
+  // effect runs close together could both read trialAttempted=false before the first
+  // setState commits, firing startTrial() twice (seen in practice, ~0.3s apart).
+  const trialAttemptedRef = useRef(false)
   const [trialMessage, setTrialMessage] = useState('')
 
   // First-ever launch on this machine: silently start a 3-day trial — no key needed.
   // Idempotent server-side, so this is safe to attempt on every cold start until activated.
   useEffect(() => {
-    if (license.isActivated || trialAttempted) return
-    setTrialAttempted(true)
+    if (license.isActivated || trialAttemptedRef.current) return
+    trialAttemptedRef.current = true
     startTrial().then(result => {
       if (result.valid && result.licenseKey && result.expiresAt) {
         license.activate(result.licenseKey, result.customerName || 'Trial User', result.expiresAt)
@@ -64,7 +68,7 @@ export default function App() {
         setTrialMessage(result.reason)
       }
     })
-  }, [license.isActivated, trialAttempted])
+  }, [license.isActivated])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -73,6 +77,20 @@ export default function App() {
     usePurchaseOrderStore.getState().init()
     useSupplierPOStore.getState().init()
     useDeliveryChallanStore.getState().init()
+  }, [isLoggedIn])
+
+  // Once per launch, check GitHub for a newer release than what's installed and
+  // surface it as a toast — the About & License page also lets the user re-check manually.
+  useEffect(() => {
+    if (!isLoggedIn) return
+    fetchLatestRelease().then(latest => {
+      if (latest && isNewerVersion(latest.version, CURRENT_APP_VERSION)) {
+        toast.info(`Invobuk v${latest.version} is available (you have v${CURRENT_APP_VERSION})`, {
+          duration: 15000,
+          action: { label: 'Download', onClick: () => window.open(latest.url, '_blank') },
+        })
+      }
+    })
   }, [isLoggedIn])
 
   // Hard local check: a previously-valid key may have simply lapsed since activation.

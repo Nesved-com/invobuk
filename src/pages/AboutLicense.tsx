@@ -1,21 +1,46 @@
-import { Globe, Mail, Download, ShieldCheck, Laptop } from 'lucide-react'
+import { useState } from 'react'
+import { Globe, Mail, ShieldCheck, RefreshCw, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useLicenseStore } from '@/store/useLicenseStore'
 import { formatExpiry, daysUntil, deactivateLicense } from '@/lib/license'
+import { fetchLatestRelease, isNewerVersion, CURRENT_APP_VERSION } from '@/lib/appUpdate'
 import invobukLogoShort from '@/assets/invobuk-logo-short.png'
 
 export default function AboutLicense() {
   const license = useLicenseStore()
   const confirm = useConfirm()
+  const [checking, setChecking] = useState(false)
+  const [latestUrl, setLatestUrl] = useState<string | null>(null)
+  const [latestVersion, setLatestVersion] = useState<string | null>(null)
 
   const handleDeactivateLicense = async () => {
     if (await confirm('This frees up the activation so the same key can be used on another computer, and locks this app until a valid license key is entered again.', { title: 'Deactivate license?', confirmText: 'Deactivate' })) {
-      await deactivateLicense(license.licenseKey)
+      const result = await deactivateLicense(license.licenseKey)
+      if (!result.ok) {
+        toast.error(result.reason || 'Could not deactivate — please try again while online')
+        return
+      }
       license.deactivate()
       toast.success('License deactivated')
+    }
+  }
+
+  const handleCheckForUpdates = async () => {
+    setChecking(true)
+    const latest = await fetchLatestRelease()
+    setChecking(false)
+    if (!latest) { toast.error('Could not check for updates — check your internet connection'); return }
+    if (isNewerVersion(latest.version, CURRENT_APP_VERSION)) {
+      setLatestVersion(latest.version)
+      setLatestUrl(latest.url)
+      toast.info(`Update available: v${latest.version}`)
+    } else {
+      setLatestVersion(null)
+      setLatestUrl(null)
+      toast.success("You're up to date")
     }
   }
 
@@ -28,7 +53,7 @@ export default function AboutLicense() {
             <img src={invobukLogoShort} alt="Invobuk" className="h-10 w-10 object-contain rounded-lg" />
             <div>
               <p className="text-sm font-semibold text-gray-800">Invobuk Desktop Application</p>
-              <p className="text-xs text-gray-500">Developed and licensed by NesVed</p>
+              <p className="text-xs text-gray-500">Version {CURRENT_APP_VERSION} · Developed and licensed by NesVed</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -38,12 +63,24 @@ export default function AboutLicense() {
             <a href="mailto:contact@nesved.com" className="flex items-center gap-2 text-brand-600 hover:underline">
               <Mail className="w-4 h-4" /> contact@nesved.com
             </a>
-            <a href="https://github.com/Nesved-com/invobuk/releases/latest/download/Invobuk-Setup.exe" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline">
-              <Download className="w-4 h-4" /> Download for Windows
-            </a>
-            <a href="https://github.com/Nesved-com/invobuk/releases/latest/download/Invobuk.AppImage" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline">
-              <Laptop className="w-4 h-4" /> Download for Linux (AppImage)
-            </a>
+          </div>
+
+          <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+            <div className="text-sm">
+              {latestVersion ? (
+                <>
+                  <p className="font-semibold text-amber-700">Update available: v{latestVersion}</p>
+                  <a href={latestUrl!} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-brand-600 hover:underline mt-0.5">
+                    <Download className="w-3.5 h-3.5" /> Download latest version
+                  </a>
+                </>
+              ) : (
+                <p className="text-gray-600">You're on the latest version</p>
+              )}
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={handleCheckForUpdates} disabled={checking}>
+              <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} /> Check for Updates
+            </Button>
           </div>
 
           {license.isActivated && (

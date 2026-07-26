@@ -1,7 +1,7 @@
 {
   "name": "invobuk",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Invobuk — desktop billing & invoicing application",
   "author": {
     "name": "NesVed",
