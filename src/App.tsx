@@ -100,13 +100,23 @@ export default function App() {
     }
   }, [license.isActivated, license.expiresAt])
 
-  // Re-verify with the license server once a day (when online) — picks up revocations
-  // or expiry changes without requiring re-activation. Silently skipped if offline,
-  // so the app still works without an internet connection between checks.
+  // Re-verify with the license server (when online) — picks up revocations, deletions,
+  // or expiry changes without requiring re-activation. Silently skipped if offline, so
+  // the app still works without an internet connection between checks.
+  //
+  // lastVerifiedAt is PERSISTED to disk, so gating purely on "was it >24h ago" would mean
+  // a launch right after a successful check skips verification entirely — including if
+  // the license was deleted/revoked server-side in the meantime. launchVerifyDone is a
+  // ref (in-memory only), so it forces exactly one check on every fresh app launch; the
+  // 24h gate then only applies to avoid re-checking repeatedly within one long-running session.
+  const launchVerifyDone = useRef(false)
   useEffect(() => {
     if (!license.isActivated || !license.licenseKey) return
-    const lastVerified = license.lastVerifiedAt ? new Date(license.lastVerifiedAt).getTime() : 0
-    if (Date.now() - lastVerified < 24 * 60 * 60 * 1000) return
+    if (launchVerifyDone.current) {
+      const lastVerified = license.lastVerifiedAt ? new Date(license.lastVerifiedAt).getTime() : 0
+      if (Date.now() - lastVerified < 24 * 60 * 60 * 1000) return
+    }
+    launchVerifyDone.current = true
 
     activateLicense(license.licenseKey).then(result => {
       if (result.valid && result.expiresAt) {
