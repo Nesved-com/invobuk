@@ -39,9 +39,9 @@ export default function PurchaseOrders() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search orders…"
-              className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 w-56" />
+              className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 w-56" />
           </div>
-          <Link to="/purchase-orders/new" className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 font-semibold text-sm shadow-lg shadow-amber-200 transition-colors">
+          <Link to="/purchase-orders/new" className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-xl hover:brightness-105 font-semibold text-sm shadow-lg shadow-brand-900/20 transition-colors">
             <Plus className="w-4 h-4" /> New Purchase Order
           </Link>
         </div>
@@ -62,13 +62,13 @@ export default function PurchaseOrders() {
           <Tbody>
             {filtered.length === 0 ? (
               <TEmpty colSpan={6} icon={<ShoppingCart className="w-10 h-10" />} message="No purchase orders yet"
-                action={<Link to="/purchase-orders/new" className="text-amber-600 hover:underline text-sm">Create first order</Link>} />
+                action={<Link to="/purchase-orders/new" className="text-brand-700 hover:underline text-sm">Create first order</Link>} />
             ) : filtered.map((po, i) => (
               <Tr key={po.id} clickable onClick={() => navigate(`/purchase-orders/${po.id}/edit`)}>
                 <Td>
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-md bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                    <span className="font-bold text-amber-700 font-mono text-xs">{po.number}</span>
+                    <span className="w-6 h-6 rounded-md bg-brand-100 text-brand-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                    <span className="font-bold text-brand-700 font-mono text-xs">{po.number}</span>
                   </div>
                 </Td>
                 <Td><p className="font-semibold text-gray-800 text-sm">{po.customerName}</p></Td>
@@ -77,7 +77,7 @@ export default function PurchaseOrders() {
                 <Td align="right"><span className="font-bold text-gray-900">{formatCurrency(po.grandTotal)}</span></Td>
                 <Td align="center" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-center gap-1.5">
-                    <button onClick={() => navigate(`/purchase-orders/${po.id}/edit`)} className="w-8 h-8 flex items-center justify-center border border-gray-200 text-amber-500 hover:bg-amber-50 hover:border-amber-200 rounded-lg transition-colors" title="Edit"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => navigate(`/purchase-orders/${po.id}/edit`)} className="w-8 h-8 flex items-center justify-center border border-gray-200 text-brand-600 hover:bg-brand-50 hover:border-brand-200 rounded-lg transition-colors" title="Edit"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => setPreviewPO(po)} className="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Preview"><Eye className="w-4 h-4" /></button>
                     <button onClick={e => handleDelete(po, e)} className="w-8 h-8 flex items-center justify-center border border-gray-200 text-red-400 hover:bg-red-50 hover:border-red-200 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                   </div>

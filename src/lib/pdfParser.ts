@@ -234,7 +234,7 @@ function parseSterlitePO(lines: string[], full: string): Partial<ParsedPO> {
       /^Make\s*:/i.test(l) ||
       /^Standard\s*-/i.test(l) ||
       /^Deliv\.?\s*date/i.test(l) ||
-      /^([\d,]+(?:\.\d+)?)\s+(NUMBER|NO|NOS|m|M|KG|MTR|Mtr|meter)/i.test(l) ||
+      /^([\d,]+(?:\.\d+)?)\s+(NUMBER|NO|NOS|AU|m|M|KG|MTR|Mtr|meter)/i.test(l) ||
       /^INR$/i.test(l)
 
     for (let bi = 2; bi < block.length; bi++) {
@@ -263,14 +263,14 @@ function parseSterlitePO(lines: string[], full: string): Partial<ParsedPO> {
       }
     }
 
-    // Find qty+unit line — pattern like "20 NUMBER" or "3,500 m" or "4 NUMBER" or "8 NUMBER" or "10 NUMBER"
-    const qtyLinePattern = /^([\d,]+(?:\.\d+)?)\s+(NUMBER|NO|NOS|m|M|KG|MTR|Mtr|meter)/i
+    // Find qty+unit line — pattern like "20 NUMBER" or "3,500 m" or "4 NUMBER" or "8 NUMBER" or "10 NUMBER" or "1 AU"
+    const qtyLinePattern = /^([\d,]+(?:\.\d+)?)\s+(NUMBER|NO|NOS|AU|m|M|KG|MTR|Mtr|meter)/i
     for (const line of block) {
       const m = line.trim().match(qtyLinePattern)
       if (m) {
         qty = cleanNum(m[1])
         const rawUnit = m[2].toUpperCase()
-        unit = rawUnit === 'NUMBER' || rawUnit === 'NO' || rawUnit === 'NOS' ? 'Nos'
+        unit = rawUnit === 'NUMBER' || rawUnit === 'NO' || rawUnit === 'NOS' || rawUnit === 'AU' ? 'Nos'
           : rawUnit === 'M' || rawUnit === 'MTR' || rawUnit === 'METER' ? 'Mtr'
           : rawUnit
         break

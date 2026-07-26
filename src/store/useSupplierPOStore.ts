@@ -48,6 +48,10 @@ export interface SupplierPO {
   status: 'pending' | 'received' | 'partial' | 'cancelled'
   sourceType: 'pdf' | 'manual'
   pdfName?: string
+  // Key under which the original uploaded PDF bytes are saved on disk (via
+  // electronExport.saveIncomingPoPdf) — lets a later monthly export copy the real
+  // original file instead of regenerating one from the extracted data.
+  pdfFileId?: string
   createdAt: string
 }
 

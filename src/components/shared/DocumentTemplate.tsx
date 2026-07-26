@@ -1,8 +1,8 @@
 import { forwardRef } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import type { BaseDocument, Company, Customer } from '@/types'
 import { formatCurrency, formatDate, numberToWords } from '@/lib/utils'
 import { getStateCode } from '@/lib/states'
+import { DEFAULT_PRINT_SETTINGS, getPageDimensionsMm, type PrintSettings } from '@/lib/printSettings'
 
 type DocWithExtras = BaseDocument & {
   type: string
@@ -17,10 +17,11 @@ interface Props {
   document: DocWithExtras
   company: Company
   customer?: Customer
+  printSettings?: PrintSettings
 }
 
 const s = {
-  page: { width: '210mm', minHeight: '297mm', padding: '8mm 10mm', fontSize: '10px', fontFamily: 'Arial, sans-serif', color: '#111', backgroundColor: '#fff' } as React.CSSProperties,
+  page: { width: '210mm', minHeight: '297mm', padding: '8mm 10mm', boxSizing: 'border-box', fontSize: '10px', fontFamily: 'Arial, sans-serif', color: '#111', backgroundColor: '#fff' } as React.CSSProperties,
   headerTitle: { textAlign: 'center' as const, fontSize: '18px', fontWeight: '900', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '2px' },
   headerSub: { textAlign: 'center' as const, fontSize: '13px', color: '#333', marginBottom: '1px' },
   table: { width: '100%', borderCollapse: 'collapse' as const },
@@ -33,9 +34,18 @@ const s = {
   section: { border: '1px solid #aaa', padding: '5px 7px', marginBottom: '0' },
 }
 
-function InvoiceStyleTemplate({ document: doc, company, customer, title, numberLabel, dateLabel }: Props & { title: string; numberLabel: string; dateLabel: string }) {
+function InvoiceStyleTemplate({ document: doc, company, customer, printSettings, title, numberLabel, dateLabel }: Props & { title: string; numberLabel: string; dateLabel: string }) {
   const shipTo = doc.shipToSame ? customer : (doc.shipTo || customer)
   const intra = doc.gstType === 'intra'
+
+  const ps = printSettings ?? DEFAULT_PRINT_SETTINGS
+  const { width: pageWMm, height: pageHMm } = getPageDimensionsMm(ps.pageSize, ps.orientation)
+  const pageStyle: React.CSSProperties = {
+    ...s.page,
+    width: `${pageWMm}mm`,
+    minHeight: `${pageHMm}mm`,
+    padding: `${ps.marginTop}mm ${ps.marginRight}mm ${ps.marginBottom}mm ${ps.marginLeft}mm`,
+  }
 
   // Extra invoice fields
   const inv = doc as any
@@ -44,6 +54,7 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
   const schemeVal = inv.schemeDiscount ?? 0
   const cashDiscPct = inv.cashDiscountPercent ?? 0
   const cashDiscAmt = doc.subtotal * cashDiscPct / 100
+  const showDisc = doc.type !== 'quotation' && doc.showDiscount !== false
   const netAmount = doc.grandTotal
   const tcsAmt = netAmount * tcsPercent / 100
   const rounded = Math.round(netAmount + tcsAmt)
@@ -51,7 +62,7 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
   const n = (v: number) => v.toLocaleString('en-IN', { minimumFractionDigits: 2 })
 
   return (
-    <div style={{ ...s.page, fontSize: '12.5px', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ ...pageStyle, fontSize: '12.5px', display: 'flex', flexDirection: 'column' }}>
 
       {/* Title */}
       <div style={{ position: 'relative', textAlign: 'center', fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>
@@ -113,6 +124,12 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
                         <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>P.O. Date</td>
                         <td style={s.td}>{doc.poDate ? formatDate(doc.poDate) : ''}</td>
                       </tr>
+                      {(doc as any).showSuppliersRef !== false && (doc as any).suppliersRef && (
+                        <tr>
+                          <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>Suppliers Ref</td>
+                          <td style={s.td}>{(doc as any).suppliersRef}</td>
+                        </tr>
+                      )}
                     </>
                   ) : (
                     <tr>
@@ -120,10 +137,18 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
                       <td style={s.td}>{(doc as any).expectedDelivery ? formatDate((doc as any).expectedDelivery) : ''}</td>
                     </tr>
                   )}
-                  <tr>
-                    <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>Terms of Payment</td>
-                    <td style={s.td}>{doc.paymentTerms || '0'}</td>
-                  </tr>
+                  {doc.showPaymentTerms !== false && (
+                    <tr>
+                      <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>Terms of Payment</td>
+                      <td style={s.td}>{/^\d+$/.test((doc.paymentTerms || '0').trim()) ? `${doc.paymentTerms || '0'} Days` : doc.paymentTerms}</td>
+                    </tr>
+                  )}
+                  {doc.type === 'invoice' && doc.showDueDate !== false && doc.dueDate && (
+                    <tr>
+                      <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>Due Date</td>
+                      <td style={s.td}>{formatDate(doc.dueDate)}</td>
+                    </tr>
+                  )}
                   <tr>
                     <td style={{ ...s.td, fontWeight: '700', fontSize: '13px' }}>Vendor Code</td>
                     <td style={s.td}>{doc.vendorCode}</td>
@@ -178,7 +203,7 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
               <th style={{ ...s.th, width: '40px' }}>UOM</th>
               <th style={{ ...s.th, width: '50px' }}>Rate</th>
               <th style={{ ...s.th, width: '60px' }}>Amount</th>
-              {doc.type !== 'quotation' && <th style={{ ...s.th, width: '32px' }}>Disc%</th>}
+              {showDisc && <th style={{ ...s.th, width: '32px' }}>Disc%</th>}
               <th style={{ ...s.th, width: '32px' }}>GST%</th>
               <th style={{ ...s.th, width: '58px' }}>Line Amount</th>
             </tr>
@@ -195,25 +220,31 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
                   <td style={s.tdCenter}>{item.unit}</td>
                   <td style={s.tdRight}>{n(item.rate)}</td>
                   <td style={s.tdRight}>{n(item.quantity * item.rate)}</td>
-                  {doc.type !== 'quotation' && <td style={s.tdCenter}>{item.discount || 0}%</td>}
+                  {showDisc && <td style={s.tdCenter}>{item.discount || 0}%</td>}
                   <td style={s.tdCenter}>{item.gstRate}%</td>
                   <td style={s.tdRight}>{n(lineAmt)}</td>
                 </tr>
               )
             })}
             <tr style={{ height: '100%' }}>
-              {Array.from({ length: doc.type === 'quotation' ? 9 : 10 }).map((__, j) => <td key={j} style={{ ...s.td, padding: 0 }}>&nbsp;</td>)}
+              {Array.from({ length: showDisc ? 10 : 9 }).map((__, j) => <td key={j} style={{ ...s.td, padding: 0 }}>&nbsp;</td>)}
             </tr>
+            {!!doc.roundOff && (
+              <tr>
+                <td style={s.td} colSpan={showDisc ? 9 : 8}>Round Off</td>
+                <td style={s.tdRight}>{doc.roundOff < 0 ? '(-)' : '(+)'}{n(Math.abs(doc.roundOff))}</td>
+              </tr>
+            )}
             <tr style={{ fontWeight: '700', background: '#f5f5f5' }}>
               <td style={s.td} colSpan={3}>Total</td>
               <td style={s.tdCenter}>{doc.items.reduce((sum, i) => sum + i.quantity, 0)}</td>
               <td style={s.td}></td>
               <td style={s.td}></td>
               <td style={s.tdRight}>{n(doc.items.reduce((sum, i) => sum + i.quantity * i.rate, 0))}</td>
-              {doc.type !== 'quotation' && <td style={s.td}></td>}
+              {showDisc && <td style={s.td}></td>}
               <td style={s.td}></td>
               <td style={s.tdRight}>
-                {n(doc.items.reduce((sum, i) => sum + (intra ? i.amount + i.cgst + i.sgst : i.amount + i.igst), 0))}
+                {n(doc.items.reduce((sum, i) => sum + (intra ? i.amount + i.cgst + i.sgst : i.amount + i.igst), 0) + doc.roundOff)}
               </td>
             </tr>
           </tbody>
@@ -224,7 +255,10 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
       <table style={{ ...s.table, marginBottom: '0' }}>
         <tbody>
           <tr>
-            <td style={{ ...s.td, width: '55%', borderRight: 'none' }} rowSpan={3 + (schemeVal ? 1 : 0) + (cashDiscPct ? 1 : 0) + (intra ? 2 : 1) + (tcsPercent ? 1 : 0)}></td>
+            <td style={{ ...s.td, width: '55%', borderRight: 'none', verticalAlign: 'top', fontSize: '13px' }} rowSpan={3 + (schemeVal ? 1 : 0) + (cashDiscPct ? 1 : 0) + (intra ? 2 : 1) + (tcsPercent ? 1 : 0)}>
+              <div><strong>Amount chargeable (in words) : </strong>INR {numberToWords(rounded)}</div>
+              {remarks && <div style={{ marginTop: '3px' }}><strong>Remarks:</strong> {remarks}</div>}
+            </td>
             <td style={{ ...s.td, textAlign: 'right', fontWeight: '700', borderLeft: 'none' }}>Gross Amount</td>
             <td style={{ ...s.tdRight, width: '70px' }}>{n(doc.subtotal)}</td>
           </tr>
@@ -273,39 +307,13 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
         </tbody>
       </table>
 
-      {/* Amount in words + Remarks */}
-      <table style={{ ...s.table, marginBottom: '3px' }}>
-        <tbody>
-          <tr>
-            <td style={{ ...s.td, fontSize: '13px' }}>
-              <strong>Amount chargeable (in words) : </strong>INR {numberToWords(rounded)}
-            </td>
-          </tr>
-          {remarks && (
-            <tr>
-              <td style={{ ...s.td, fontSize: '13px' }}><strong>Remarks:</strong> {remarks}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-
-      {/* QR + Bank — not applicable to quotations */}
+      {/* Bank — not applicable to quotations */}
       {doc.type === 'invoice' && (
         <table style={{ ...s.table, marginBottom: '3px' }}>
           <tbody>
             <tr>
-              <td style={{ ...s.td, width: '50%', verticalAlign: 'middle' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '4px' }}>Unique QR Code</div>
-                  <QRCodeSVG
-                    value={doc.number}
-                    size={70}
-                    level="L"
-                  />
-                </div>
-              </td>
-              <td style={{ ...s.td, width: '50%', verticalAlign: 'top' }}>
+              <td style={{ ...s.td, width: '50%', borderRight: 'none' }}></td>
+              <td style={{ ...s.td, width: '50%', verticalAlign: 'top', textAlign: 'right' }}>
                 <div style={{ fontWeight: '700', marginBottom: '3px' }}>Company Bank Details</div>
                 <div>Bank Name :{company.bankName}</div>
                 <div>A/c No.:{company.accountNumber}</div>
@@ -330,7 +338,7 @@ function InvoiceStyleTemplate({ document: doc, company, customer, title, numberL
               </div>
             </td>
             <td style={{ ...s.td, width: '40%', textAlign: 'right', verticalAlign: 'bottom' }}>
-              <div style={{ fontWeight: '700', fontSize: '12.5px' }}>for {company.name.toUpperCase()}</div>
+              <div style={{ fontWeight: '700', fontSize: '12.5px', whiteSpace: 'nowrap' }}>for {company.name.toUpperCase()}</div>
               <div style={{ marginTop: '28px', borderTop: '1px solid #999', paddingTop: '3px', fontSize: '13px' }}>Authorised Signatory</div>
             </td>
           </tr>

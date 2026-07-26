@@ -4,17 +4,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Matches the sidebar / New Invoice redesign exactly (Claude Design project
+        // "Billing Software Invoice Redesign") — 900 is the sidebar's own background.
         brand: {
-          50:  '#ecfdf5',
-          100: '#d1fae5',
-          200: '#a7f3d0',
-          300: '#6ee7b7',
-          400: '#34d399',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#0f5132',
-          900: '#0a3a24',
+          50:  '#ECFBF3',
+          100: '#E7F3EC',
+          200: '#BEE3CF',
+          300: '#8FC9AE',
+          400: '#4FD6A0',
+          500: '#28C384',
+          600: '#13A26A',
+          700: '#0F7A52',
+          800: '#0B6B47',
+          900: '#0C1714',
         },
         amber: {
           50:  '#fffbeb',
@@ -25,6 +27,8 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        manrope: ['Manrope', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
     },
   },

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron')
 const path = require('path')
 const os = require('os')
 const crypto = require('crypto')
@@ -309,6 +309,45 @@ ipcMain.handle('google-oauth-refresh', async (_event, clientId, clientSecret, re
   })
   return res.json()
 })
+
+// ─── File export (monthly CA folder, incoming PO PDFs) ──────────────────────
+// Incoming Purchase Orders parsed from an uploaded PDF keep a copy of the original
+// file here, keyed by the id we hand back to the renderer — so a later "export this
+// month's documents" pass can copy the real original instead of re-generating one.
+function incomingPoDir() {
+  const dir = path.join(app.getPath('userData'), 'incoming-po-pdfs')
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+ipcMain.handle('save-incoming-po-pdf', (_event, fileId, bytes) => {
+  const filePath = path.join(incomingPoDir(), `${fileId}.pdf`)
+  fs.writeFileSync(filePath, Buffer.from(bytes))
+  return filePath
+})
+
+ipcMain.handle('select-export-folder', async () => {
+  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+  if (result.canceled || !result.filePaths.length) return null
+  return result.filePaths[0]
+})
+
+ipcMain.handle('ensure-dir', (_event, dirPath) => {
+  fs.mkdirSync(dirPath, { recursive: true })
+})
+
+ipcMain.handle('export-write-file', (_event, filePath, bytes) => {
+  fs.writeFileSync(filePath, Buffer.from(bytes))
+})
+
+ipcMain.handle('export-copy-incoming-pdf', (_event, fileId, destPath) => {
+  const src = path.join(incomingPoDir(), `${fileId}.pdf`)
+  if (!fs.existsSync(src)) return false
+  fs.copyFileSync(src, destPath)
+  return true
+})
+
+ipcMain.handle('open-path', (_event, targetPath) => shell.openPath(targetPath))
 
 async function createWindow() {
   const win = new BrowserWindow({

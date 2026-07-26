@@ -9,7 +9,7 @@ interface Props {
 }
 
 const s = {
-  page: { width: '210mm', minHeight: '297mm', padding: '8mm 10mm', fontSize: '13px', fontFamily: 'Arial, sans-serif', color: '#111', backgroundColor: '#fff' } as React.CSSProperties,
+  page: { width: '210mm', minHeight: '297mm', padding: '8mm 10mm', boxSizing: 'border-box', fontSize: '13px', fontFamily: 'Arial, sans-serif', color: '#111', backgroundColor: '#fff' } as React.CSSProperties,
   box: { border: '1px solid #333' },
   td: { border: '1px solid #333', padding: '6px 10px', fontSize: '13px', verticalAlign: 'top' as const },
 }

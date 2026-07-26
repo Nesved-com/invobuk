@@ -22,3 +22,12 @@ contextBridge.exposeInMainWorld('electronGoogleAuth', {
   start:   (clientId, clientSecret) => ipcRenderer.invoke('google-oauth-start', clientId, clientSecret),
   refresh: (clientId, clientSecret, refreshToken) => ipcRenderer.invoke('google-oauth-refresh', clientId, clientSecret, refreshToken),
 })
+
+contextBridge.exposeInMainWorld('electronExport', {
+  saveIncomingPoPdf: (fileId, bytes)      => ipcRenderer.invoke('save-incoming-po-pdf', fileId, bytes),
+  selectFolder:      ()                   => ipcRenderer.invoke('select-export-folder'),
+  ensureDir:         (dirPath)            => ipcRenderer.invoke('ensure-dir', dirPath),
+  writeFile:         (filePath, bytes)    => ipcRenderer.invoke('export-write-file', filePath, bytes),
+  copyIncomingPdf:   (fileId, destPath)   => ipcRenderer.invoke('export-copy-incoming-pdf', fileId, destPath),
+  openPath:          (targetPath)         => ipcRenderer.invoke('open-path', targetPath),
+})

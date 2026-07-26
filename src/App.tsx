@@ -37,6 +37,7 @@ import ShippingAddresses from './pages/ShippingAddresses'
 import SupplierPurchaseOrders from './pages/SupplierPurchaseOrders'
 import DeliveryChallans from './pages/DeliveryChallans'
 import DeliveryChallanForm from './pages/DeliveryChallanForm'
+import MonthlyExport from './pages/MonthlyExport'
 
 export default function App() {
   const { isLoggedIn } = useAuthStore()
@@ -148,6 +149,7 @@ export default function App() {
             <Route path="/purchase-orders/:id" element={<PurchaseOrderView />} />
             <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderEdit />} />
             <Route path="/incoming-purchase-orders" element={<SupplierPurchaseOrders />} />
+            <Route path="/monthly-export" element={<MonthlyExport />} />
             <Route path="/delivery-challans" element={<DeliveryChallans />} />
             <Route path="/delivery-challans/new" element={<DeliveryChallanForm />} />
             <Route path="/delivery-challans/:id/edit" element={<DeliveryChallanForm />} />

@@ -96,13 +96,25 @@ export default function SupplierPurchaseOrders() {
       const text = await extractTextFromPDF(file)
       setRawText(text)
       const parsed = parsePDFText(text)
-      setForm(p => ({
-        ...p,
+
+      // Keep a copy of the original PDF bytes on disk (Electron only) so a later
+      // monthly export can hand the CA the real original document, not a re-render.
+      let pdfFileId: string | undefined
+      const exportBridge = (window as any).electronExport
+      if (exportBridge) {
+        pdfFileId = uuidv4()
+        const bytes = await file.arrayBuffer()
+        await exportBridge.saveIncomingPoPdf(pdfFileId, new Uint8Array(bytes))
+      }
+
+      setForm({
+        ...defaultForm(),
         ...parsed,
-        items: parsed.items?.length ? parsed.items : p.items,
+        items: parsed.items?.length ? parsed.items : [emptyItem()],
         pdfName: file.name,
+        pdfFileId,
         sourceType: 'pdf',
-      }))
+      })
       toast.success('PDF parsed! Review the data below and save.')
     } catch (err: any) {
       toast.error('Could not read PDF: ' + err.message)

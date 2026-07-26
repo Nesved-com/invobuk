@@ -108,6 +108,9 @@ export interface BaseDocument {
   notes: string
   terms: string
   paymentTerms: string
+  showPaymentTerms?: boolean
+  showDueDate?: boolean
+  showDiscount?: boolean
   declaration: string
   status: DocumentStatus
   createdAt: string
@@ -119,6 +122,7 @@ export interface Invoice extends BaseDocument {
   paidDate?: string
   // Extra invoice fields
   suppliersRef: string
+  showSuppliersRef?: boolean
   tcsPercent?: number
   remarks: string
   schemeDiscount?: number
@@ -131,6 +135,7 @@ export interface Quotation extends BaseDocument {
   kindAttention: string
   enquirySource: string
   enquiryDate: string
+  paidAmount?: number
 }
 
 export interface PurchaseOrder extends BaseDocument {
